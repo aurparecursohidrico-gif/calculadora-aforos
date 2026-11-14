@@ -297,6 +297,10 @@ body:not(.on-calc) .qbar { display: none !important; }
 .seg-mini { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: color-mix(in srgb, var(--line) 50%, transparent); }
 .seg-mini button { border: 0; background: none; padding: 8px 14px; border-radius: 9px; font: 700 .88rem var(--font-body); color: var(--muted); cursor: pointer; min-height: 38px; }
 .seg-mini button[aria-pressed="true"] { background: var(--surface); color: var(--brand); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.rainmap { display: block; width: 100%; height: auto; border-radius: 10px; background: #fff; box-shadow: 0 0 0 1px var(--line); }
+#ll-modo-w .seg-mini { align-self: flex-start; }
+.kpi.wide { grid-column: 1 / -1; }
+.kpi.wide b { font-size: 1.05rem; }
 .chart-box { position: relative; height: 320px; }
 @media (min-width: 720px) { .chart-box { height: 400px; } }
 .note { font-size: .8rem; color: var(--muted); margin: 0; }
@@ -412,13 +416,21 @@ body{margin:0}[hidden]{display:none!important}
 <!-- ================= LLUVIAS ================= -->
 <section class="scr page" id="scr-lluvia" hidden>
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <h2>Lluvia en la cuenca</h2>
-      <div class="seg-mini" id="ll-modo"><button type="button" data-v="dia" aria-pressed="true">Diaria</button><button type="button" data-v="mes" aria-pressed="false">Mensual</button></div>
+    <h2>Lluvia en la cuenca</h2>
+    <div class="filters">
+      <label class="f">Mes <select id="ll-mes"></select></label>
+      <div class="f" id="ll-modo-w">Ver por
+        <div class="seg-mini" id="ll-modo"><button type="button" data-v="dia" aria-pressed="true">Día</button><button type="button" data-v="mes" aria-pressed="false">Mes</button></div>
+      </div>
     </div>
     <div class="kpis" id="ll-kpis"></div>
     <div class="chart-box"><canvas id="ll-chart" aria-label="Gráfico de lluvias"></canvas></div>
     <p class="note" id="ll-note"></p>
+  </div>
+  <div class="card">
+    <h2 id="ll-mapa-tit">Mapa de lluvias</h2>
+    <a id="ll-mapa-link" target="_blank" rel="noopener"><img id="ll-mapa" class="rainmap" alt="Mapa de precipitación acumulada de la cuenca del río La Paila" loading="lazy"></a>
+    <p class="note">Precipitación acumulada interpolada, escala fija para comparar meses. Toca el mapa para verlo en grande. Elaboró: Ing. Mariana Charry Pérez.</p>
   </div>
 </section>
 
@@ -1649,14 +1661,18 @@ body{margin:0}[hidden]{display:none!important}
     const af = datos ? todosLosAforos() : [];
     const ult = af.slice().sort((a, b) => (a.f + a.h < b.f + b.h ? 1 : -1))[0];
     const k = [];
+    // Último aforo con su lugar, método y fecha
+    k.push(ult
+      ? `<div class="kpi wide"><span>Último aforo · ${fdl(ult.f)}${ult.h ? " " + esc(ult.h) : ""} · ${esc(ult.m)}</span><b>${esc(ult.s)}: ${fmt(ult.q, 1)} L/s</b></div>`
+      : `<div class="kpi wide"><span>Último aforo</span><b>—</b></div>`);
     k.push(`<div class="kpi"><b>${af.length || "—"}</b><span>aforos guardados</span></div>`);
-    k.push(`<div class="kpi"><b>${ult ? fmt(ult.q, 1) : "—"}</b><span>${ult ? `L/s · último (${fd(ult.f)})` : "último aforo"}</span></div>`);
     const L = lluviasCache;
     if (L && L.dias && L.dias.length) {
       const mesU = L.dias[L.dias.length - 1].f.slice(0, 7);
       const tot = L.dias.filter((d) => d.f.startsWith(mesU)).reduce((s, d) => s + d.mm, 0);
       k.push(`<div class="kpi"><b>${fmt(tot, 0)}</b><span>mm de lluvia en ${MESL[+mesU.slice(5) - 1]}</span></div>`);
     } else k.push(`<div class="kpi"><b>—</b><span>lluvia del último mes</span></div>`);
+    k.push(`<div class="kpi"><b>${new Set(af.map((a) => a.s)).size || "—"}</b><span>sitios aforados</span></div>`);
     $("kpis").innerHTML = k.join("");
     notaSync();
     if (!lluviasCache) lluvias().then(() => { if (scr === "inicio") onShow.inicio(); });
@@ -1670,32 +1686,57 @@ body{margin:0}[hidden]{display:none!important}
     $("ll-modo").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
     onShow.lluvia();
   });
+  $("ll-mes").addEventListener("change", () => onShow.lluvia());
   onShow.lluvia = async () => {
     const L = await lluvias();
     if (!L) { $("ll-note").textContent = "No se pudieron cargar las lluvias. Revisa la conexión."; return; }
-    try { await cargarScript(CHART_JS); } catch (e) { $("ll-note").textContent = e.message; return; }
     const meses = {};
     L.dias.forEach((d) => { const m = d.f.slice(0, 7); meses[m] = (meses[m] || 0) + d.mm; });
-    const total = L.dias.reduce((s, d) => s + d.mm, 0);
-    const mMax = Object.keys(meses).sort((a, b) => meses[b] - meses[a])[0];
-    const dMax = L.dias.reduce((a, d) => (d.mm > a.mm ? d : a), L.dias[0]);
-    $("ll-kpis").innerHTML = `<div class="kpi"><b>${fmt(total, 0)} mm</b><span>${fd(L.dias[0].f)} – ${fd(L.dias[L.dias.length - 1].f)} 2026</span></div>` +
-      `<div class="kpi"><b>${MESL[+mMax.slice(5) - 1]}</b><span>mes más lluvioso (${fmt(meses[mMax], 0)} mm)</span></div>` +
-      `<div class="kpi"><b>${fmt(dMax.mm, 1)} mm</b><span>día más lluvioso (${fd(dMax.f)})</span></div>`;
-    const dia = llModo === "dia";
-    const labels = dia ? L.dias.map((d) => fd(d.f)) : Object.keys(meses).map((m) => `${MES[+m.slice(5) - 1]} ${m.slice(0, 4)}`);
-    const vals = dia ? L.dias.map((d) => d.mm) : Object.keys(meses).map((m) => Math.round(meses[m] * 10) / 10);
+    const lista = Object.keys(meses).sort();
+    // Selector de mes: por defecto "Todos los meses" (gráfico completo y mapa comparativo)
+    const previo = $("ll-mes").value;
+    llenarSelect($("ll-mes"), [{ v: "todos", t: "Todos los meses" }].concat(lista.slice().reverse().map((m) => ({ v: m, t: `${MESL[+m.slice(5) - 1]} ${m.slice(0, 4)}` }))),
+      previo || "todos");
+    const mes = $("ll-mes").value, todos = mes === "todos";
+    $("ll-modo-w").hidden = !todos;
+    // Mapa del mes (escala fija); con "todos" se muestra el comparativo
+    $("ll-mapa").src = todos ? "lluvias/comparativo.jpg" : `lluvias/${mes}.jpg`;
+    $("ll-mapa-link").href = $("ll-mapa").src;
+    $("ll-mapa-tit").textContent = todos ? "Mapas de lluvias · comparativo febrero–octubre" : `Mapa de lluvias · ${MESL[+mes.slice(5) - 1]} ${mes.slice(0, 4)}`;
+    $("ll-mapa").onerror = () => { $("ll-mapa-tit").textContent = "Mapa de lluvias · aún no hay mapa para este mes"; $("ll-mapa").removeAttribute("src"); };
+
+    const dias = todos ? L.dias : L.dias.filter((d) => d.f.startsWith(mes));
+    const total = dias.reduce((s, d) => s + d.mm, 0);
+    const dMax = dias.reduce((a, d) => (d.mm > a.mm ? d : a), dias[0]);
+    if (todos) {
+      const mMax = lista.slice().sort((a, b) => meses[b] - meses[a])[0];
+      $("ll-kpis").innerHTML = `<div class="kpi"><b>${fmt(total, 0)} mm</b><span>${fd(L.dias[0].f)} – ${fd(L.dias[L.dias.length - 1].f)} 2026</span></div>` +
+        `<div class="kpi"><b>${MESL[+mMax.slice(5) - 1]}</b><span>mes más lluvioso (${fmt(meses[mMax], 0)} mm)</span></div>` +
+        `<div class="kpi"><b>${fmt(dMax.mm, 1)} mm</b><span>día más lluvioso (${fd(dMax.f)})</span></div>`;
+    } else {
+      const conLluvia = dias.filter((d) => d.mm >= 1).length;
+      $("ll-kpis").innerHTML = `<div class="kpi"><b>${fmt(total, 0)} mm</b><span>lluvia en ${MESL[+mes.slice(5) - 1]}</span></div>` +
+        `<div class="kpi"><b>${fmt(dMax.mm, 1)} mm</b><span>día más lluvioso (${fd(dMax.f)})</span></div>` +
+        `<div class="kpi"><b>${conLluvia}</b><span>días con lluvia (≥ 1 mm)</span></div>`;
+    }
+    try { await cargarScript(CHART_JS); } catch (e) { $("ll-note").textContent = e.message; return; }
+    const dia = !todos || llModo === "dia";
+    const labels = dia ? dias.map((d) => fd(d.f)) : lista.map((m) => `${MES[+m.slice(5) - 1]} ${m.slice(0, 4)}`);
+    const vals = dia ? dias.map((d) => d.mm) : lista.map((m) => Math.round(meses[m] * 10) / 10);
     if (llChart) llChart.destroy();
     const ink = cssVar("--muted"), grid = cssVar("--line");
     llChart = new Chart($("ll-chart"), {
       type: "bar",
       data: { labels, datasets: [{ label: dia ? "Lluvia diaria (mm)" : "Lluvia mensual (mm)", data: vals, backgroundColor: cssVar("--river"), borderRadius: dia ? 2 : 6 }] },
       options: { responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${fmt(c.parsed.y, 1)} mm` } } },
+        // En la vista por mes, tocar una barra abre ese mes
+        onClick: (ev, els) => { if (!dia && els.length) { $("ll-mes").value = lista[els[0].index]; onShow.lluvia(); } },
+        onHover: (ev, els) => { ev.native.target.style.cursor = !dia && els.length ? "pointer" : "default"; },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${fmt(c.parsed.y, 1)} mm`, footer: () => (dia ? "" : "Toca para ver el mes") } } },
         scales: { x: { ticks: { color: ink, autoSkip: true, maxRotation: 0 }, grid: { display: false } },
           y: { title: { display: true, text: "mm", color: ink }, ticks: { color: ink }, grid: { color: grid } } } }
     });
-    $("ll-note").textContent = `Lluvia diaria de la cuenca: promedio de los pluviómetros ponderado por el área de influencia de cada uno. Fuente: Excel «INFO PLUVIOMETROS DIARIO» de los boletines AURPA 2026 (hoja INFO DIARIA). Se descartó una lectura imposible (Totoró 2, 5 de marzo: 1.027,6 mm).`;
+    $("ll-note").textContent = `Gráfico: promedio de los pluviómetros ponderado por el área de influencia de cada uno (Excel «INFO PLUVIOMETROS DIARIO» de los boletines AURPA 2026). El mapa usa interpolación, por eso su promedio puede diferir un poco del gráfico. Se descartó una lectura imposible (Totoró 2, 5 de marzo: 1.027,6 mm).`;
   };
 
   // ---------- Lluvias vs caudales ----------
