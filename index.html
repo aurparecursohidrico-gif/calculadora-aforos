@@ -432,6 +432,19 @@ body{margin:0}[hidden]{display:none!important}
     <a id="ll-mapa-link" target="_blank" rel="noopener"><img id="ll-mapa" class="rainmap" alt="Mapa de precipitación acumulada de la cuenca del río La Paila" loading="lazy"></a>
     <p class="note">Precipitación acumulada interpolada, escala fija para comparar meses. Toca el mapa para verlo en grande. Elaboró: Ing. Mariana Charry Pérez.</p>
   </div>
+  <form class="card" id="f-ll" hidden>
+    <h2>Actualizar lluvias</h2>
+    <p class="note">Solo administradores. Sube el Excel «INFO PLUVIOMETROS DIARIO» del mes (hoja INFO DIARIA) y su mapa de lluvias. Puedes subir los dos o solo uno. Si ese mes ya estaba, se reemplaza.</p>
+    <div class="fields">
+      <label class="f">Mes <input id="ll-up-mes" type="month" required></label>
+      <label class="f full">Excel de pluviómetros (.xlsx) <input id="ll-up-xls" type="file" accept=".xlsx,.xls"></label>
+      <label class="f full">Mapa de lluvias (imagen JPG o PNG) <input id="ll-up-img" type="file" accept="image/*"></label>
+    </div>
+    <label class="switch"><input type="checkbox" id="ll-up-comp"> Este mapa es el comparativo de todos los meses</label>
+    <div class="warn" id="ll-up-prev" hidden></div>
+    <button class="btn primary" id="ll-up-btn" type="submit">Guardar en el Drive</button>
+    <p class="msg-err" id="ll-up-msg" role="alert"></p>
+  </form>
 </section>
 
 <!-- ================= LLUVIAS VS CAUDALES ================= -->
@@ -1610,7 +1623,7 @@ body{margin:0}[hidden]{display:none!important}
 
   // ---------- Datos: caudales del Drive (con copia en el dispositivo) y lluvias ----------
   const DKEY = "aforo-datos", LLKEY = "aforo-lluvias";
-  let datos = ls.get(DKEY, null), cargando = null, lluviasCache = ls.get(LLKEY, null);
+  let datos = ls.get(DKEY, null), cargando = null, lluviasCache = null;
   function cargarDatos() {
     if (PREVIEW || !token() || !navigator.onLine) return Promise.resolve(datos);
     if (cargando) return cargando;
@@ -1630,14 +1643,40 @@ body{margin:0}[hidden]{display:none!important}
       ? `Datos del Drive actualizados el ${new Date(datos.t).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).replace(/\.$/, "")}.`
       : (PREVIEW ? "" : "Aún no se han descargado los datos del Drive.");
   }
-  async function lluvias() {
-    if (lluviasCache && Date.now() - (lluviasCache._t || 0) < 6 * 36e5) return lluviasCache;
-    try {
-      const r = await fetch("datos-lluvias.json", { cache: "no-cache" });
-      if (!r.ok) throw new Error();
-      lluviasCache = await r.json(); lluviasCache._t = Date.now(); ls.set(LLKEY, lluviasCache);
-    } catch (e) {}
+  // Lluvias = serie base del repositorio (feb–oct 2026) + meses subidos al Drive por un administrador.
+  // Un mes subido al Drive reemplaza al de la serie base.
+  let llBase = ls.get(LLKEY + "-base", null), llSrv = ls.get(LLKEY + "-drive", null), llT = 0;
+  lluviasCache = combinarLluvias();
+  function combinarLluvias() {
+    if (!llBase && !llSrv) return null;
+    const srv = (llSrv && llSrv.dias) || [];
+    const mesesSrv = new Set(srv.map((d) => d.f.slice(0, 7)));
+    const dias = ((llBase && llBase.dias) || []).filter((d) => !mesesSrv.has(d.f.slice(0, 7))).concat(srv).sort((a, b) => (a.f < b.f ? -1 : 1));
+    return { dias, areas: Object.assign({}, llBase && llBase.areas, llSrv && llSrv.areas), mapas: (llSrv && llSrv.mapas) || [] };
+  }
+  async function lluvias(forzar) {
+    if (forzar || !lluviasCache || Date.now() - llT > 6 * 36e5) {
+      llT = Date.now();
+      try { const r = await fetch("datos-lluvias.json", { cache: "no-cache" }); if (r.ok) { llBase = await r.json(); ls.set(LLKEY + "-base", llBase); } } catch (e) {}
+      if (!PREVIEW && token() && navigator.onLine) {
+        try { const j = await api("lluvias"); if (j && j.ok) { llSrv = { dias: j.dias || [], areas: j.areas || {}, mapas: j.mapas || [] }; ls.set(LLKEY + "-drive", llSrv); } } catch (e) {}
+      }
+      lluviasCache = combinarLluvias();
+    }
     return lluviasCache;
+  }
+  // Mapa de un mes: si se subió al Drive se pide al Drive; si no, el del repositorio.
+  const mapasDrive = {};
+  async function srcMapa(clave) {
+    const L = lluviasCache;
+    if (L && L.mapas.includes(clave) && !PREVIEW && token()) {
+      if (mapasDrive[clave]) return mapasDrive[clave];
+      try {
+        const j = await api("mapaLluvia", { mes: clave });
+        if (j && j.ok) { const b = await (await fetch(j.imagen)).blob(); return (mapasDrive[clave] = URL.createObjectURL(b)); }
+      } catch (e) {}
+    }
+    return `lluvias/${clave}.jpg`;
   }
   const metodosConDatos = () => Object.keys((datos && datos.aforos) || {}).filter((m) => datos.aforos[m].length);
   const todosLosAforos = () => metodosConDatos().flatMap((m) => datos.aforos[m].map((a) => Object.assign({ m }, a)));
@@ -1700,10 +1739,12 @@ body{margin:0}[hidden]{display:none!important}
     const mes = $("ll-mes").value, todos = mes === "todos";
     $("ll-modo-w").hidden = !todos;
     // Mapa del mes (escala fija); con "todos" se muestra el comparativo
-    $("ll-mapa").src = todos ? "lluvias/comparativo.jpg" : `lluvias/${mes}.jpg`;
-    $("ll-mapa-link").href = $("ll-mapa").src;
-    $("ll-mapa-tit").textContent = todos ? "Mapas de lluvias · comparativo febrero–octubre" : `Mapa de lluvias · ${MESL[+mes.slice(5) - 1]} ${mes.slice(0, 4)}`;
-    $("ll-mapa").onerror = () => { $("ll-mapa-tit").textContent = "Mapa de lluvias · aún no hay mapa para este mes"; $("ll-mapa").removeAttribute("src"); };
+    const tit = todos ? "Mapas de lluvias · comparativo" : `Mapa de lluvias · ${MESL[+mes.slice(5) - 1]} ${mes.slice(0, 4)}`;
+    $("ll-mapa-tit").textContent = tit;
+    $("ll-mapa").onerror = () => { $("ll-mapa-tit").textContent = tit + " · aún no hay mapa"; $("ll-mapa").removeAttribute("src"); };
+    srcMapa(todos ? "comparativo" : mes).then((u) => { if ($("ll-mes").value === mes) { $("ll-mapa").src = u; $("ll-mapa-link").href = u; } });
+    $("f-ll").hidden = PREVIEW || (sesionActual() || {}).rol !== "admin";
+    if (!$("ll-up-mes").value) $("ll-up-mes").value = siguienteMes(lista[lista.length - 1]);
 
     const dias = todos ? L.dias : L.dias.filter((d) => d.f.startsWith(mes));
     const total = dias.reduce((s, d) => s + d.mm, 0);
@@ -1738,6 +1779,137 @@ body{margin:0}[hidden]{display:none!important}
     });
     $("ll-note").textContent = `Gráfico: promedio de los pluviómetros ponderado por el área de influencia de cada uno (Excel «INFO PLUVIOMETROS DIARIO» de los boletines AURPA 2026). El mapa usa interpolación, por eso su promedio puede diferir un poco del gráfico. Se descartó una lectura imposible (Totoró 2, 5 de marzo: 1.027,6 mm).`;
   };
+
+  // ---------- Subir lluvias del mes (administrador) ----------
+  const XLSX_JS = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+  const siguienteMes = (m) => { if (!m) return ""; const d = new Date(+m.slice(0, 4), +m.slice(5, 7), 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+  const nombreMes = (m) => `${MESL[+m.slice(5, 7) - 1]} ${m.slice(0, 4)}`;
+  function mesDeArchivo(nombre) {
+    const u = nombre.toUpperCase(), i = MESL.findIndex((m) => u.includes(m.toUpperCase())), y = (u.match(/20\d\d/) || [])[0];
+    return i >= 0 && y ? `${y}-${String(i + 1).padStart(2, "0")}` : "";
+  }
+  let llExcel = null;   // hoja ya leída del Excel
+  async function leerExcel(file) {
+    await cargarScript(XLSX_JS);
+    const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+    const hoja = wb.SheetNames.find((n) => /INFO\s*DIARI/i.test(n)) || wb.SheetNames.find((n) => n.trim().toUpperCase() === "PLUVIOMETROS");
+    if (!hoja) throw new Error("No encontré la hoja «INFO DIARIA» en el Excel.");
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { header: 1, raw: true, defval: null });
+    let hr = -1;
+    for (let r = 0; r < Math.min(15, filas.length) && hr < 0; r++) if ((filas[r] || []).some((c) => /NOMBRE/i.test(String(c || "")))) hr = r;
+    if (hr < 0) throw new Error("No encontré el encabezado «NOMBRE DEL PLUVIOMETRO» en la hoja.");
+    let cNom = -1, cPluv = -1, cArea = -1; const colDia = {};
+    filas[hr].forEach((c, i) => {
+      const t = String(c == null ? "" : c).trim(), u = t.toUpperCase();
+      if (/NOMBRE/.test(u)) cNom = i;
+      else if (/PLUV/.test(u)) cPluv = i;
+      else if (/^[ÁA]REA/.test(u)) cArea = i;
+      else { const m = t.match(/^(d\S{1,2}a\s*)?(\d{1,2})$/i); if (m) colDia[+m[2]] = i; }
+    });
+    if (cNom < 0 || cPluv < 0 || !Object.keys(colDia).length) throw new Error("La hoja no tiene las columnas esperadas (PLUV No, nombre y días).");
+    return { hoja, filas, hr, cNom, cPluv, cArea, colDia };
+  }
+  // Lluvia diaria de la cuenca = promedio ponderado por el área de influencia (igual que la serie base).
+  function calcularLluvia(x, mes, areasPrevias) {
+    const ndias = new Date(+mes.slice(0, 4), +mes.slice(5, 7), 0).getDate();
+    const areas = {}, suma = {}, area = {}, n = {}, descartes = [], sinArea = [];
+    let pluviometros = 0;
+    for (let r = x.hr + 1; r < x.filas.length; r++) {
+      const f = x.filas[r] || [], nom = String(f[x.cNom] == null ? "" : f[x.cNom]).trim(), pluv = String(f[x.cPluv] == null ? "" : f[x.cPluv]).trim();
+      if (!nom || !pluv || /TOTAL|PROMEDIO/i.test(nom)) continue;
+      pluviometros++;
+      let a = x.cArea >= 0 ? (typeof f[x.cArea] === "number" ? f[x.cArea] : num(f[x.cArea])) : NaN;
+      if (a > 0) areas[pluv] = a; else a = areasPrevias[pluv];
+      if (!(a > 0)) { sinArea.push(nom); continue; }
+      for (let d = 1; d <= ndias; d++) {
+        const c = x.colDia[d]; if (c == null) continue;
+        const v = f[c], mm = typeof v === "number" ? v : num(v);
+        if (!isFinite(mm)) continue;
+        if (mm > 250) { descartes.push(`${nom}, día ${d}: ${fmt(mm, 1)} mm`); continue; }
+        const k = `${mes}-${String(d).padStart(2, "0")}`;
+        suma[k] = (suma[k] || 0) + mm * a; area[k] = (area[k] || 0) + a; n[k] = (n[k] || 0) + 1;
+      }
+    }
+    const dias = Object.keys(suma).sort().map((k) => ({ f: k, mm: Math.round((suma[k] / area[k]) * 100) / 100, n: n[k] }));
+    return { dias, areas, pluviometros, descartes, sinArea };
+  }
+  async function vistaPrevia() {
+    const prev = $("ll-up-prev"), mes = $("ll-up-mes").value;
+    $("ll-up-msg").textContent = "";
+    const partes = [];
+    if (llExcel && mes) {
+      const r = calcularLluvia(llExcel, mes, (lluviasCache && lluviasCache.areas) || {});
+      const total = r.dias.reduce((s, d) => s + d.mm, 0);
+      partes.push(r.dias.length
+        ? `Excel: ${nombreMes(mes)} · ${r.pluviometros} pluviómetros · ${r.dias.length} días · lluvia de la cuenca ${fmt(total, 1)} mm.`
+        : `El Excel no tiene lluvias para ${nombreMes(mes)}. Revisa que el mes sea el correcto.`);
+      if (r.descartes.length) partes.push(`Se descartan lecturas imposibles (más de 250 mm): ${r.descartes.join("; ")}.`);
+      if (r.sinArea.length) partes.push(`Sin área de influencia (no entran al promedio): ${r.sinArea.join(", ")}.`);
+    }
+    if ($("ll-up-img").files[0]) partes.push(`Mapa: ${$("ll-up-comp").checked ? "comparativo de todos los meses" : nombreMes(mes || "2026-01")}.`);
+    const L = lluviasCache;
+    if (mes && L && ((llExcel && L.dias.some((d) => d.f.startsWith(mes))) || ($("ll-up-img").files[0] && !$("ll-up-comp").checked && L.mapas.includes(mes))))
+      partes.push(`Ya hay datos de ${nombreMes(mes)}: al guardar se reemplazan.`);
+    prev.hidden = !partes.length;
+    prev.innerHTML = partes.map(esc).join("<br>");
+  }
+  $("ll-up-xls").addEventListener("change", async () => {
+    const f = $("ll-up-xls").files[0]; llExcel = null;
+    if (!f) return vistaPrevia();
+    const m = mesDeArchivo(f.name); if (m) $("ll-up-mes").value = m;
+    $("ll-up-prev").hidden = false; $("ll-up-prev").textContent = "Leyendo el Excel…";
+    try { llExcel = await leerExcel(f); } catch (e) { $("ll-up-prev").hidden = true; $("ll-up-msg").textContent = e.message || "No se pudo leer el Excel."; return; }
+    vistaPrevia();
+  });
+  $("ll-up-img").addEventListener("change", () => { const f = $("ll-up-img").files[0]; if (f && /COMPARATIV/i.test(f.name)) $("ll-up-comp").checked = true; else if (f) { const m = mesDeArchivo(f.name); if (m && !llExcel) $("ll-up-mes").value = m; } vistaPrevia(); });
+  $("ll-up-mes").addEventListener("change", vistaPrevia);
+  $("ll-up-comp").addEventListener("change", vistaPrevia);
+  function comprimirImagen(file) {
+    return new Promise((ok, no) => {
+      const img = new Image(), u = URL.createObjectURL(file);
+      img.onload = () => {
+        const w = Math.min(1600, img.naturalWidth), h = Math.round((img.naturalHeight * w) / img.naturalWidth);
+        const c = document.createElement("canvas"); c.width = w; c.height = h;
+        const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(u); ok(c.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = () => { URL.revokeObjectURL(u); no(new Error("No se pudo leer la imagen del mapa.")); };
+      img.src = u;
+    });
+  }
+  $("f-ll").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const mes = $("ll-up-mes").value, img = $("ll-up-img").files[0], btn = $("ll-up-btn"), msg = $("ll-up-msg");
+    msg.className = "msg-err"; msg.textContent = "";
+    if (!mes) { msg.textContent = "Elige el mes."; return; }
+    if (!llExcel && !img) { msg.textContent = "Elige el Excel, el mapa o los dos."; return; }
+    btn.disabled = true; btn.textContent = "Guardando…";
+    const hecho = [];
+    try {
+      if (llExcel) {
+        const r = calcularLluvia(llExcel, mes, (lluviasCache && lluviasCache.areas) || {});
+        if (!r.dias.length) throw new Error(`El Excel no tiene lluvias para ${nombreMes(mes)}.`);
+        const j = await api("subirLluvias", { mes, dias: r.dias, areas: r.areas });
+        if (!j.ok) throw new Error(j.error);
+        hecho.push(`lluvias de ${nombreMes(mes)} (${r.dias.length} días)`);
+      }
+      if (img) {
+        const clave = $("ll-up-comp").checked ? "comparativo" : mes;
+        const j = await api("subirMapa", { mes: clave, imagen: await comprimirImagen(img) });
+        if (!j.ok) throw new Error(j.error);
+        delete mapasDrive[clave];
+        hecho.push(clave === "comparativo" ? "mapa comparativo" : `mapa de ${nombreMes(mes)}`);
+      }
+      const verMes = img && $("ll-up-comp").checked && !llExcel ? "todos" : mes;
+      msg.className = "msg-ok"; msg.textContent = `Guardado en el Drive: ${hecho.join(" y ")}.`;
+      $("f-ll").reset(); llExcel = null; $("ll-up-prev").hidden = true;
+      await lluvias(true);
+      await onShow.lluvia();                       // reconstruye la lista de meses
+      $("ll-mes").value = verMes; await onShow.lluvia();   // y muestra lo que se acaba de subir
+    } catch (err) {
+      msg.textContent = (hecho.length ? `Se guardó: ${hecho.join(" y ")}. ` : "") + "No se guardó lo demás: " + (err.message || "sin conexión.");
+    } finally { btn.disabled = false; btn.textContent = "Guardar en el Drive"; }
+  });
 
   // ---------- Lluvias vs caudales ----------
   let lqChart = null, lqRango = "aforos";

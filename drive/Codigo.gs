@@ -23,14 +23,16 @@
  */
 
 var CARPETA_RAIZ = 'Aforos AURPA';
-var MAX_BYTES = 200000; // tamaño máximo de un aforo recibido
+var MAX_BYTES = 200000;     // tamaño máximo de un aforo recibido
+var MAX_MAPA = 4000000;     // tamaño máximo de un mapa de lluvias (imagen en base64)
 
 function doPost(e) {
   try {
     var raw = e && e.postData ? e.postData.contents : '';
-    if (!raw || raw.length > MAX_BYTES) return responder({ ok: false, error: 'Datos vacíos o demasiado grandes.' });
+    if (!raw || raw.length > MAX_MAPA) return responder({ ok: false, error: 'Datos vacíos o demasiado grandes.' });
     var a = JSON.parse(raw);
     var accion = String(a.accion || 'guardar');
+    if (accion !== 'subirMapa' && raw.length > MAX_BYTES) return responder({ ok: false, error: 'Datos demasiado grandes.' });
 
     // Sin sesión: solo iniciar sesión, consultar si falta el primer administrador o crearlo.
     if (accion === 'login') return responder(login(a));
@@ -42,8 +44,12 @@ function doPost(e) {
     if (accion === 'datos') return responder({ ok: true, aforos: aforosPorMetodo(), sitios: listarSitios(), ubicaciones: leerUbicaciones() });
     if (accion === 'sitios') return responder({ ok: true, sitios: listarSitios() });
     if (accion === 'cambiarClave') return responder(cambiarClave(ses, a));
-    if (accion === 'ubicar' || accion === 'usuarios' || accion === 'crearUsuario' || accion === 'estadoUsuario') {
+    if (accion === 'lluvias') return responder({ ok: true, dias: leerLluvias(), areas: leerAreas(), mapas: listarMapas() });
+    if (accion === 'mapaLluvia') return responder(leerMapa(a.mes));
+    if (accion === 'ubicar' || accion === 'usuarios' || accion === 'crearUsuario' || accion === 'estadoUsuario' || accion === 'subirLluvias' || accion === 'subirMapa') {
       if (ses.rol !== 'admin') return responder({ ok: false, error: 'Solo un administrador puede hacer esto.' });
+      if (accion === 'subirLluvias') return responder(subirLluvias(ses, a));
+      if (accion === 'subirMapa') return responder(subirMapa(ses, a));
       if (accion === 'ubicar') return responder(guardarUbicacion(ses, a));
       if (accion === 'usuarios') return responder({ ok: true, usuarios: listarUsuarios() });
       if (accion === 'crearUsuario') return responder(crearUsuario(a));
@@ -252,6 +258,102 @@ function aforosPorMetodo() {
     }).filter(function (x) { return x.s && x.f && x.q !== ''; });
   }
   return out;
+}
+
+// =====================================================================
+// LLUVIAS: serie diaria de la cuenca por mes y mapas mensuales.
+// La app lee el Excel "INFO PLUVIOMETROS DIARIO" y envía la lluvia diaria ya calculada
+// (promedio ponderado por área de influencia). Aquí se guarda, reemplazando ese mes.
+// =====================================================================
+var HOJA_LLUVIAS = 'Lluvias diarias (app)';
+var CARPETA_MAPAS = 'Mapas de lluvias (app)';
+
+function libroLluvias() {
+  var raiz = carpetaRaiz();
+  var it = raiz.getFilesByName(HOJA_LLUVIAS);
+  if (it.hasNext()) return SpreadsheetApp.open(it.next());
+  var ss = SpreadsheetApp.create(HOJA_LLUVIAS);
+  DriveApp.getFileById(ss.getId()).moveTo(raiz);
+  var sh = ss.getSheets()[0];
+  sh.setName('Lluvia diaria');
+  sh.appendRow(['Fecha', 'Lluvia cuenca (mm)', 'Pluviómetros', 'Mes', 'Subido por', 'Subido']);
+  sh.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#e6f3e2');
+  sh.setFrozenRows(1);
+  var ar = ss.insertSheet('Áreas');
+  ar.appendRow(['PLUV No', 'Área de influencia']);
+  ar.getRange(1, 1, 1, 2).setFontWeight('bold').setBackground('#e6f3e2');
+  return ss;
+}
+function leerLluvias() {
+  var sh = libroLluvias().getSheetByName('Lluvia diaria'), n = sh.getLastRow() - 1;
+  if (n < 1) return [];
+  return sh.getRange(2, 1, n, 3).getValues().map(function (r) {
+    return { f: String(r[0]), mm: numero(r[1]), n: numero(r[2]) };
+  }).filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d.f) && d.mm !== ''; });
+}
+function leerAreas() {
+  var sh = libroLluvias().getSheetByName('Áreas'), n = sh.getLastRow() - 1, out = {};
+  if (n < 1) return out;
+  sh.getRange(2, 1, n, 2).getValues().forEach(function (r) { var a = numero(r[1]); if (r[0] !== '' && a !== '') out[String(r[0])] = a; });
+  return out;
+}
+function subirLluvias(ses, a) {
+  var mes = String(a.mes || '');
+  if (!/^\d{4}-\d{2}$/.test(mes)) return { ok: false, error: 'Mes no válido.' };
+  var dias = (a.dias || []).filter(function (d) { return d && String(d.f).indexOf(mes) === 0 && numero(d.mm) !== ''; });
+  if (!dias.length) return { ok: false, error: 'El archivo no trae lluvias para ese mes.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var ss = libroLluvias(), sh = ss.getSheetByName('Lluvia diaria');
+    // Quitar las filas que ya había de ese mes
+    var n = sh.getLastRow() - 1;
+    if (n > 0) {
+      var meses = sh.getRange(2, 4, n, 1).getValues();
+      for (var i = n - 1; i >= 0; i--) if (String(meses[i][0]) === mes) sh.deleteRow(i + 2);
+    }
+    var ahora = new Date();
+    var filas = dias.map(function (d) { return [String(d.f), numero(d.mm), numero(d.n), mes, ses.nombre, ahora]; });
+    var inicio = sh.getLastRow() + 1;
+    sh.getRange(inicio, 1, filas.length, 1).setNumberFormat('@');   // fecha como texto (aaaa-mm-dd)
+    sh.getRange(inicio, 4, filas.length, 1).setNumberFormat('@');
+    sh.getRange(inicio, 1, filas.length, 6).setValues(filas);
+    sh.getRange(2, 1, sh.getLastRow() - 1, 6).sort({ column: 1, ascending: true });
+    // Áreas de influencia: se actualizan las que vengan en el archivo
+    var areas = a.areas || {}, ar = ss.getSheetByName('Áreas');
+    var actuales = leerAreas();
+    Object.keys(areas).forEach(function (k) { if (numero(areas[k]) !== '') actuales[k] = numero(areas[k]); });
+    if (ar.getLastRow() > 1) ar.getRange(2, 1, ar.getLastRow() - 1, 2).clearContent();
+    var lista = Object.keys(actuales).map(function (k) { return [k, actuales[k]]; });
+    if (lista.length) { ar.getRange(2, 1, lista.length, 1).setNumberFormat('@'); ar.getRange(2, 1, lista.length, 2).setValues(lista); }
+    return { ok: true, dias: filas.length };
+  } finally { lock.releaseLock(); }
+}
+
+function carpetaMapas() { return buscarOCrear(carpetaRaiz(), CARPETA_MAPAS); }
+function nombreMapa(mes) { return 'Mapa lluvias ' + mes + '.jpg'; }
+function mesMapaValido(mes) { return /^\d{4}-\d{2}$/.test(mes) || mes === 'comparativo'; }
+function subirMapa(ses, a) {
+  var mes = String(a.mes || '');
+  if (!mesMapaValido(mes)) return { ok: false, error: 'Mes no válido.' };
+  var datos = String(a.imagen || '').replace(/^data:image\/\w+;base64,/, '');
+  if (!datos) return { ok: false, error: 'Falta la imagen.' };
+  var carpeta = carpetaMapas(), it = carpeta.getFilesByName(nombreMapa(mes));
+  while (it.hasNext()) it.next().setTrashed(true);   // reemplaza el mapa anterior de ese mes
+  var blob = Utilities.newBlob(Utilities.base64Decode(datos), 'image/jpeg', nombreMapa(mes));
+  carpeta.createFile(blob).setDescription('Subido por ' + ses.nombre);
+  return { ok: true };
+}
+function listarMapas() {
+  var out = [], it = carpetaMapas().getFiles();
+  while (it.hasNext()) { var m = it.next().getName().match(/^Mapa lluvias (\d{4}-\d{2}|comparativo)\.jpg$/); if (m) out.push(m[1]); }
+  return out;
+}
+function leerMapa(mes) {
+  mes = String(mes || '');
+  if (!mesMapaValido(mes)) return { ok: false, error: 'Mes no válido.' };
+  var it = carpetaMapas().getFilesByName(nombreMapa(mes));
+  if (!it.hasNext()) return { ok: false, error: 'No hay mapa para ese mes.' };
+  return { ok: true, mes: mes, imagen: 'data:image/jpeg;base64,' + Utilities.base64Encode(it.next().getBlob().getBytes()) };
 }
 
 var HOJA_UBICACIONES = 'Ubicaciones de sitios (app)';
