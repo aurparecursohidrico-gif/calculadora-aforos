@@ -12,6 +12,12 @@
  *         <Sitio> – 2026-11-03/
  *           Aforo 09h40 · Molinete · 172,30 L/s
  *
+ *     Usuarios de la app (no compartir)      (cuentas: usuario, nombre, rol; las contraseñas se guardan como huella)
+ *     Ubicaciones de sitios (app)            (latitud y longitud de cada punto de aforo para el mapa)
+ *
+ * La app pide iniciar sesión: todas las acciones (guardar, consultar datos, ubicar, usuarios) exigen un token.
+ * La primera persona que entra, mientras no hay usuarios, crea la cuenta de administrador.
+ *
  * Se instala UNA vez desde la cuenta aurparecursohidrico@gmail.com
  * (Implementar → Nueva implementación → Aplicación web).
  */
@@ -24,6 +30,28 @@ function doPost(e) {
     var raw = e && e.postData ? e.postData.contents : '';
     if (!raw || raw.length > MAX_BYTES) return responder({ ok: false, error: 'Datos vacíos o demasiado grandes.' });
     var a = JSON.parse(raw);
+    var accion = String(a.accion || 'guardar');
+
+    // Sin sesión: solo iniciar sesión, consultar si falta el primer administrador o crearlo.
+    if (accion === 'login') return responder(login(a));
+    if (accion === 'estado') return responder({ ok: true, necesitaAdmin: !hayUsuarios() });
+    if (accion === 'primerAdmin') return responder(primerAdmin(a));
+
+    var ses = sesion(a.token);
+    if (!ses) return responder({ ok: false, sesion: false, error: 'Tu sesión venció. Vuelve a iniciar sesión.' });
+    if (accion === 'datos') return responder({ ok: true, aforos: aforosPorMetodo(), sitios: listarSitios(), ubicaciones: leerUbicaciones() });
+    if (accion === 'sitios') return responder({ ok: true, sitios: listarSitios() });
+    if (accion === 'cambiarClave') return responder(cambiarClave(ses, a));
+    if (accion === 'ubicar' || accion === 'usuarios' || accion === 'crearUsuario' || accion === 'estadoUsuario') {
+      if (ses.rol !== 'admin') return responder({ ok: false, error: 'Solo un administrador puede hacer esto.' });
+      if (accion === 'ubicar') return responder(guardarUbicacion(ses, a));
+      if (accion === 'usuarios') return responder({ ok: true, usuarios: listarUsuarios() });
+      if (accion === 'crearUsuario') return responder(crearUsuario(a));
+      if (accion === 'estadoUsuario') return responder(estadoUsuario(ses, a));
+    }
+    if (accion !== 'guardar') return responder({ ok: false, error: 'Acción desconocida.' });
+    if (!a.responsable) a.responsable = ses.nombre;
+
     var predio = limpiarNombre(a.predio, 80);
     if (!predio) return responder({ ok: false, error: 'Falta el nombre del predio.' });
 
@@ -64,8 +92,199 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  if (e && e.parameter && e.parameter.accion === 'sitios') return responder({ ok: true, sitios: listarSitios() });
-  return responder({ ok: true, servicio: 'Calculadora de Aforos AURPA' });
+  // Los datos ya no se entregan sin iniciar sesión: solo se informa que el servicio está activo.
+  return responder({ ok: true, servicio: 'App de Aforos AURPA', necesitaAdmin: !hayUsuarios() });
+}
+
+// =====================================================================
+// USUARIOS Y SESIONES
+// Hoja "Usuarios de la app (no compartir)" en la carpeta principal.
+// Las contraseñas no se guardan: solo una huella (SHA-256 con sal, repetida).
+// =====================================================================
+var HOJA_USUARIOS = 'Usuarios de la app (no compartir)';
+var DIAS_SESION = 30;
+
+function hojaUsuarios() {
+  var raiz = carpetaRaiz();
+  var it = raiz.getFilesByName(HOJA_USUARIOS);
+  if (it.hasNext()) return SpreadsheetApp.open(it.next()).getSheets()[0];
+  var ss = SpreadsheetApp.create(HOJA_USUARIOS);
+  DriveApp.getFileById(ss.getId()).moveTo(raiz);
+  var sh = ss.getSheets()[0];
+  sh.setName('Usuarios');
+  sh.appendRow(['Usuario', 'Nombre', 'Rol', 'Activo', 'Sal', 'Huella', 'Creado', 'Último ingreso']);
+  sh.getRange(1, 1, 1, 8).setFontWeight('bold').setBackground('#e6f3e2');
+  sh.setFrozenRows(1);
+  sh.hideColumns(5, 2);
+  return sh;
+}
+function filasUsuarios() {
+  var sh = hojaUsuarios(), n = sh.getLastRow() - 1;
+  if (n < 1) return [];
+  return sh.getRange(2, 1, n, 8).getValues().map(function (r, i) {
+    return { fila: i + 2, usuario: String(r[0]), nombre: String(r[1]), rol: String(r[2]), activo: r[3] === true || String(r[3]).toUpperCase() === 'SI', sal: String(r[4]), huella: String(r[5]) };
+  });
+}
+function hayUsuarios() { return filasUsuarios().length > 0; }
+function usuarioValido(u) { return /^[a-z0-9._-]{3,30}$/.test(u); }
+function huella(sal, clave) {
+  var h = sal + '|' + clave;
+  for (var i = 0; i < 300; i++) {
+    h = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, h + '|' + sal, Utilities.Charset.UTF_8)
+      .map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
+  }
+  return h;
+}
+function nuevaSal() { return Utilities.getUuid().replace(/-/g, ''); }
+
+function login(a) {
+  var u = String(a.usuario || '').trim().toLowerCase(), clave = String(a.clave || '');
+  var cache = CacheService.getScriptCache(), kFallos = 'fallos_' + u;
+  var fallos = Number(cache.get(kFallos) || 0);
+  if (fallos >= 5) return { ok: false, error: 'Demasiados intentos. Espera 10 minutos e inténtalo de nuevo.' };
+  var usr = filasUsuarios().filter(function (x) { return x.usuario === u; })[0];
+  if (!usr || !usr.activo || huella(usr.sal, clave) !== usr.huella) {
+    cache.put(kFallos, String(fallos + 1), 600);
+    return { ok: false, error: 'Usuario o contraseña incorrectos.' };
+  }
+  cache.remove(kFallos);
+  hojaUsuarios().getRange(usr.fila, 8).setValue(new Date());
+  return abrirSesion(usr);
+}
+function abrirSesion(usr) {
+  var props = PropertiesService.getScriptProperties();
+  limpiarSesiones(props);
+  var token = Utilities.getUuid() + Utilities.getUuid().slice(0, 8);
+  var exp = Date.now() + DIAS_SESION * 864e5;
+  props.setProperty('S_' + token, JSON.stringify({ u: usr.usuario, n: usr.nombre, r: usr.rol, exp: exp }));
+  return { ok: true, token: token, usuario: usr.usuario, nombre: usr.nombre, rol: usr.rol, exp: exp };
+}
+function sesion(token) {
+  if (!token || !/^[A-Za-z0-9-]{20,80}$/.test(String(token))) return null;
+  var s = PropertiesService.getScriptProperties().getProperty('S_' + token);
+  if (!s) return null;
+  s = JSON.parse(s);
+  if (s.exp < Date.now()) return null;
+  // Si el usuario fue desactivado, la sesión deja de valer.
+  var usr = filasUsuarios().filter(function (x) { return x.usuario === s.u; })[0];
+  if (!usr || !usr.activo) return null;
+  return { usuario: usr.usuario, nombre: usr.nombre, rol: usr.rol };
+}
+function limpiarSesiones(props) {
+  var all = props.getProperties(), ahora = Date.now();
+  Object.keys(all).forEach(function (k) {
+    if (k.indexOf('S_') !== 0) return;
+    try { if (JSON.parse(all[k]).exp < ahora) props.deleteProperty(k); } catch (e) { props.deleteProperty(k); }
+  });
+}
+// Solo funciona mientras no exista ningún usuario: así la primera persona en entrar crea su cuenta de administrador.
+function primerAdmin(a) {
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    if (hayUsuarios()) return { ok: false, error: 'Ya hay un administrador. Inicia sesión.' };
+    var r = crearUsuario({ usuario: a.usuario, nombre: a.nombre, clave: a.clave, rol: 'admin' });
+    if (!r.ok) return r;
+    return abrirSesion(filasUsuarios()[0]);
+  } finally { lock.releaseLock(); }
+}
+function crearUsuario(a) {
+  var u = String(a.usuario || '').trim().toLowerCase(), nombre = limpiar(a.nombre, 60), clave = String(a.clave || '');
+  var rol = a.rol === 'admin' ? 'admin' : 'usuario';
+  if (!usuarioValido(u)) return { ok: false, error: 'El usuario debe tener de 3 a 30 letras minúsculas, números, punto o guion (sin espacios ni tildes).' };
+  if (!nombre) return { ok: false, error: 'Escribe el nombre de la persona.' };
+  if (clave.length < 6) return { ok: false, error: 'La contraseña debe tener al menos 6 caracteres.' };
+  if (filasUsuarios().some(function (x) { return x.usuario === u; })) return { ok: false, error: 'Ya existe un usuario con ese nombre.' };
+  var sal = nuevaSal();
+  hojaUsuarios().appendRow([u, nombre, rol, true, sal, huella(sal, clave), new Date(), '']);
+  return { ok: true };
+}
+function listarUsuarios() {
+  return filasUsuarios().map(function (x) { return { usuario: x.usuario, nombre: x.nombre, rol: x.rol, activo: x.activo }; });
+}
+function estadoUsuario(ses, a) {
+  var u = String(a.usuario || '').toLowerCase();
+  if (u === ses.usuario) return { ok: false, error: 'No puedes desactivar tu propio usuario.' };
+  var usr = filasUsuarios().filter(function (x) { return x.usuario === u; })[0];
+  if (!usr) return { ok: false, error: 'No existe ese usuario.' };
+  var sh = hojaUsuarios();
+  if (a.clave) {   // restablecer contraseña
+    if (String(a.clave).length < 6) return { ok: false, error: 'La contraseña debe tener al menos 6 caracteres.' };
+    var sal = nuevaSal();
+    sh.getRange(usr.fila, 5, 1, 2).setValues([[sal, huella(sal, String(a.clave))]]);
+  }
+  if (typeof a.activo === 'boolean') sh.getRange(usr.fila, 4).setValue(a.activo);
+  return { ok: true };
+}
+function cambiarClave(ses, a) {
+  var usr = filasUsuarios().filter(function (x) { return x.usuario === ses.usuario; })[0];
+  if (!usr || huella(usr.sal, String(a.actual || '')) !== usr.huella) return { ok: false, error: 'La contraseña actual no es correcta.' };
+  if (String(a.nueva || '').length < 6) return { ok: false, error: 'La nueva contraseña debe tener al menos 6 caracteres.' };
+  var sal = nuevaSal();
+  hojaUsuarios().getRange(usr.fila, 5, 1, 2).setValues([[sal, huella(sal, String(a.nueva))]]);
+  return { ok: true };
+}
+
+// =====================================================================
+// DATOS PARA LA APP: caudales por método (fecha y Q) y ubicación de los sitios
+// =====================================================================
+function aforosPorMetodo() {
+  var out = {}, metodos = METODOS.map(normalizar);
+  var it = carpetaRaiz().getFolders();
+  while (it.hasNext()) {
+    var carpeta = it.next();
+    var k = metodos.indexOf(normalizar(carpeta.getName()));
+    if (k < 0) continue;
+    var f = carpeta.getFilesByName('Resumen de aforos – ' + carpeta.getName());
+    if (!f.hasNext()) continue;
+    var ss = SpreadsheetApp.open(f.next()), sh = ss.getSheets()[0], tz = ss.getSpreadsheetTimeZone();
+    var n = sh.getLastRow() - 1; if (n < 1) continue;
+    var enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
+    var c = function (t) { return enc.indexOf(t); };
+    out[METODOS[k]] = sh.getRange(2, 1, n, enc.length).getValues().map(function (r) {
+      var fe = r[c('Fecha')], ho = r[c('Hora')];
+      return {
+        s: String(r[c('Sitio')] || ''),
+        f: fe instanceof Date ? Utilities.formatDate(fe, tz, 'yyyy-MM-dd') : String(fe || ''),
+        h: ho instanceof Date ? Utilities.formatDate(ho, tz, 'HH:mm') : String(ho || ''),
+        q: numero(r[c('Caudal (L/s)')]),
+        mi: c('Mira inicial (cm)') >= 0 ? numero(r[c('Mira inicial (cm)')]) : ''
+      };
+    }).filter(function (x) { return x.s && x.f && x.q !== ''; });
+  }
+  return out;
+}
+
+var HOJA_UBICACIONES = 'Ubicaciones de sitios (app)';
+function hojaUbicaciones() {
+  var raiz = carpetaRaiz();
+  var it = raiz.getFilesByName(HOJA_UBICACIONES);
+  if (it.hasNext()) return SpreadsheetApp.open(it.next()).getSheets()[0];
+  var ss = SpreadsheetApp.create(HOJA_UBICACIONES);
+  DriveApp.getFileById(ss.getId()).moveTo(raiz);
+  var sh = ss.getSheets()[0];
+  sh.setName('Ubicaciones');
+  sh.appendRow(['Sitio', 'Latitud', 'Longitud', 'Actualizado', 'Por']);
+  sh.getRange(1, 1, 1, 5).setFontWeight('bold').setBackground('#e6f3e2');
+  sh.setFrozenRows(1);
+  return sh;
+}
+function leerUbicaciones() {
+  var sh = hojaUbicaciones(), n = sh.getLastRow() - 1, out = {};
+  if (n < 1) return out;
+  sh.getRange(2, 1, n, 3).getValues().forEach(function (r) {
+    var lat = numero(r[1]), lon = numero(r[2]);
+    if (r[0] && lat !== '' && lon !== '') out[String(r[0])] = [lat, lon];
+  });
+  return out;
+}
+function guardarUbicacion(ses, a) {
+  var sitio = limpiarNombre(a.sitio, 80), lat = numero(a.lat), lon = numero(a.lon);
+  if (!sitio || lat === '' || lon === '' || Math.abs(lat) > 90 || Math.abs(lon) > 180) return { ok: false, error: 'Ubicación no válida.' };
+  var sh = hojaUbicaciones(), n = sh.getLastRow() - 1, fila = 0;
+  if (n > 0) sh.getRange(2, 1, n, 1).getValues().forEach(function (r, i) { if (normalizar(r[0]) === normalizar(sitio)) fila = i + 2; });
+  var valores = [[sitio, lat, lon, new Date(), ses.nombre]];
+  if (fila) sh.getRange(fila, 1, 1, 5).setValues(valores); else sh.appendRow(valores[0]);
+  return { ok: true };
 }
 
 // Nombres de las carpetas de sitio (dentro de cada método, o sueltas si aún no se organizaron).

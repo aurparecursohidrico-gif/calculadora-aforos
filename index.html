@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Calculadora de Aforos</title>
+<title>Aforos AURPA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -140,7 +140,7 @@ table.detail .dcol { display: table-cell; }
 .sw { width: 16px; border-top: 2.5px solid var(--bed); display: inline-block; }
 .sw.surf { border-color: var(--river); }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--point); display: inline-block; }
-svg { width: 100%; height: auto; display: block; }
+#c-svg svg { width: 100%; height: auto; display: block; }
 .sv-water { fill: var(--water); }
 .sv-bed { fill: none; stroke: var(--bed); stroke-width: 2.5; }
 .sv-bedpt { fill: var(--bed); }
@@ -242,12 +242,272 @@ details.fx.flat { border-top: 0; padding-top: 0; }
 .sv-missdot { fill: var(--surface); stroke: var(--point); stroke-width: 2; }
 .swq { width: 16px; height: 10px; border-radius: 3px; background: linear-gradient(90deg, color-mix(in srgb, var(--river) 20%, transparent), var(--river)); display: inline-block; }
 .dot.miss { background: var(--surface); box-shadow: inset 0 0 0 2px var(--point); }
+
+/* =====================================================================
+   APP DE AFOROS: pantallas (inicio de sesión, inicio, lluvias, mapa…)
+   ===================================================================== */
+.scr[hidden] { display: none !important; }
+body:not(.on-calc) .qbar { display: none !important; }
+.wrap > .top { display: none; }                 /* el encabezado de la calculadora lo reemplaza la barra de la app */
+.page { max-width: 1000px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 48px; display: flex; flex-direction: column; gap: 16px; }
+.appbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.appbar[hidden] { display: none; }
+.ab-back { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 1.2rem; cursor: pointer; flex: none; }
+.ab-back[hidden] { display: none; }
+.ab-logo { width: 46px; height: 38px; flex: none; border-radius: 8px; background-color: #fff; box-shadow: 0 0 0 1px var(--line); }
+.ab-title { font-weight: 800; font-size: 1.05rem; line-height: 1.15; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ab-title small { display: block; font-weight: 600; font-size: .72rem; color: var(--brand); }
+.ab-user { margin-left: auto; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--brand-soft); color: var(--brand); font-weight: 800; cursor: pointer; flex: none; }
+.mark.ab-logo, .mark.logo-big { background-color: #fff; background-size: contain; background-position: center; background-origin: content-box; padding: 3px; }
+.mark.ab-logo { width: 46px; height: 38px; border-radius: 8px; box-shadow: 0 0 0 1px var(--line); }
+.mark.logo-big { width: 170px; height: 140px; border-radius: 18px; padding: 10px; box-shadow: 0 6px 24px rgba(20, 40, 20, .08); }
+.preview { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); font-size: .85rem; font-weight: 700; text-align: center; }
+
+/* Inicio de sesión */
+.login { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }
+.login .box { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px; }
+.login .logo-big { width: 170px; height: 140px; margin: 0 auto; border-radius: 18px; background-color: #fff; box-shadow: 0 6px 24px rgba(20, 40, 20, .08); }
+.login h1 { margin: 0; text-align: center; font-size: 1.5rem; font-weight: 800; text-wrap: balance; }
+.login .sub { margin: -8px 0 0; text-align: center; color: var(--muted); font-size: .92rem; }
+.login form { display: flex; flex-direction: column; gap: 12px; }
+.login .btn.primary { min-height: 50px; font-size: 1rem; }
+.msg-err { margin: 0; color: var(--point); font-weight: 700; font-size: .9rem; }
+.msg-ok { margin: 0; color: var(--brand); font-weight: 700; font-size: .9rem; }
+
+/* Inicio */
+.hello { margin: 4px 0 0; font-size: 1.35rem; font-weight: 800; }
+.hello small { display: block; font-size: .9rem; font-weight: 600; color: var(--muted); }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 720px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tile { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; text-align: left; padding: 16px; min-height: 132px; border-radius: var(--radius); border: 0; background: var(--surface); color: var(--ink); cursor: pointer; box-shadow: 0 1px 2px rgba(20, 40, 20, .04), 0 6px 20px rgba(20, 40, 20, .06); font: inherit; }
+.tile:hover { box-shadow: 0 1px 2px rgba(20, 40, 20, .06), 0 10px 26px rgba(20, 40, 20, .1); }
+.tile .ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); }
+.tile .ic svg { width: 24px; height: 24px; }
+.tile b { font-size: 1rem; line-height: 1.2; }
+.tile span { font-size: .82rem; color: var(--muted); line-height: 1.3; }
+.tile.main { grid-column: 1 / -1; min-height: 0; flex-direction: row; align-items: center; background: var(--brand); color: var(--on-brand); }
+.tile.main .ic { background: color-mix(in srgb, var(--on-brand) 18%, transparent); color: var(--on-brand); }
+.tile.main span { color: color-mix(in srgb, var(--on-brand) 82%, transparent); }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.kpi { padding: 12px; border-radius: 12px; background: var(--surface); box-shadow: 0 1px 2px rgba(20, 40, 20, .04); min-width: 0; }
+.kpi b { display: block; font-size: 1.25rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.kpi span { font-size: .75rem; color: var(--muted); }
+
+/* Gráficos y tablas */
+.seg-mini { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: color-mix(in srgb, var(--line) 50%, transparent); }
+.seg-mini button { border: 0; background: none; padding: 8px 14px; border-radius: 9px; font: 700 .88rem var(--font-body); color: var(--muted); cursor: pointer; min-height: 38px; }
+.seg-mini button[aria-pressed="true"] { background: var(--surface); color: var(--brand); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.chart-box { position: relative; height: 320px; }
+@media (min-width: 720px) { .chart-box { height: 400px; } }
+.note { font-size: .8rem; color: var(--muted); margin: 0; }
+.filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.qtable { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.qtable th, .qtable td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+.qtable th:last-child, .qtable td:last-child { text-align: right; }
+.qtable tr.grp td { background: var(--brand-soft); color: var(--brand); font-weight: 800; border-bottom: 0; }
+.qtable tr.grp td span { font-weight: 600; color: var(--muted); }
+.empty { padding: 24px 12px; text-align: center; color: var(--muted); }
+
+/* Mapa */
+.map { height: 58vh; min-height: 340px; border-radius: var(--radius); overflow: hidden; z-index: 0; background: var(--water); }
+.sitelist { display: flex; flex-direction: column; }
+.site { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+.site .pin { width: 12px; height: 12px; border-radius: 50%; background: var(--brand); flex: none; box-shadow: 0 0 0 3px var(--brand-soft); }
+.site .pin.off { background: var(--surface); box-shadow: inset 0 0 0 2px var(--muted); }
+.site .txt { min-width: 0; flex: 1; }
+.site .txt b { display: block; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site .txt span { font-size: .8rem; color: var(--muted); }
+.site .btn { min-height: 36px; padding: 6px 12px; font-size: .82rem; flex: none; }
+.placing { position: sticky; top: 64px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--warn-soft); color: var(--warn); font-weight: 700; font-size: .88rem; }
+.placing .btn { min-height: 36px; padding: 6px 12px; font-size: .82rem; }
+.aforo-pin { width: 18px; height: 18px; border-radius: 50%; background: #177a34; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.leaflet-popup-content { font: 14px/1.4 var(--font-body); }
+.leaflet-popup-content table { border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.leaflet-popup-content td { padding: 2px 6px 2px 0; }
+.legend-map { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .8rem; color: var(--muted); }
+.legend-map i { display: inline-block; width: 14px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 5px; }
+
+/* Usuarios */
+.urow { display: flex; align-items: center; gap: 10px; padding: 12px 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.urow .txt { flex: 1; min-width: 160px; }
+.urow .txt b { display: block; }
+.urow .txt span { font-size: .8rem; color: var(--muted); }
+.urow .btn { min-height: 36px; padding: 6px 12px; font-size: .82rem; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .72rem; font-weight: 800; background: var(--brand-soft); color: var(--brand); margin-left: 6px; }
+.badge.off { background: var(--warn-soft); color: var(--warn); }
 body{margin:0}[hidden]{display:none!important}
 </style>
 </head>
 <body>
 
-<div class="wrap">
+<!-- ================= BARRA DE LA APP ================= -->
+<header class="appbar" id="appbar" hidden>
+  <button class="ab-back" id="ab-back" type="button" aria-label="Volver al inicio" hidden>←</button>
+  <div class="mark ab-logo" id="ab-logo" role="img" aria-label="Logo de AURPA"></div>
+  <div class="ab-title" id="ab-title"><small>AURPA</small>Aforos</div>
+  <button class="ab-user" id="ab-user" type="button" aria-label="Mi cuenta">·</button>
+</header>
+
+<!-- ================= INICIO DE SESIÓN ================= -->
+<section class="scr login" id="scr-login" hidden>
+  <div class="box">
+    <div class="mark logo-big" role="img" aria-label="Logo de AURPA"></div>
+    <h1>Aforos AURPA</h1>
+    <p class="sub">Asociación de Usuarios del Río La Paila</p>
+    <form id="f-login" class="card" autocomplete="on">
+      <label class="f">Usuario <input id="l-user" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+      <label class="f">Contraseña <input id="l-pass" name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary" type="submit" id="l-btn">Entrar</button>
+      <p class="msg-err" id="l-msg" role="alert"></p>
+    </form>
+    <form id="f-admin" class="card" hidden>
+      <h2 style="margin:0;font-size:1.05rem">Crear el primer administrador</h2>
+      <p class="note">Todavía no hay usuarios. La cuenta que crees aquí será la administradora y podrá crear las demás.</p>
+      <label class="f">Nombre completo <input id="a-nombre" type="text" autocomplete="name" required></label>
+      <label class="f">Usuario <span class="unit">(sin espacios ni tildes)</span> <input id="a-user" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+      <label class="f">Contraseña <span class="unit">(mínimo 6)</span> <input id="a-pass" type="password" autocomplete="new-password" required></label>
+      <label class="f">Repite la contraseña <input id="a-pass2" type="password" autocomplete="new-password" required></label>
+      <button class="btn primary" type="submit" id="a-btn">Crear administrador y entrar</button>
+      <p class="msg-err" id="a-msg" role="alert"></p>
+    </form>
+    <p class="foot autor">Elaborado por Ing. Mariana Charry · AURPA</p>
+  </div>
+</section>
+
+<!-- ================= INICIO ================= -->
+<section class="scr page" id="scr-inicio" hidden>
+  <p class="preview" id="preview-note" hidden>Vista previa en Claude: el inicio de sesión y los datos funcionan en mayi280302-ux.github.io/calculadora-aforos</p>
+  <p class="hello" id="hello">Hola</p>
+  <div class="kpis" id="kpis"></div>
+  <div class="tiles">
+    <button class="tile main" type="button" data-go-scr="calc">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h2M16 15v3"/></svg></span>
+      <div><b>Calculadora de aforos</b><br><span>Molinete, volumétrico, flotador, vertedero y Parshall</span></div>
+    </button>
+    <button class="tile" type="button" data-go-scr="lluvia">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 15a4 4 0 0 1 .5-8 5 5 0 0 1 9.6 1.5A3.5 3.5 0 0 1 17 15H7z"/><path d="M8 18l-1 2M12 18l-1 2M16 18l-1 2"/></svg></span>
+      <b>Lluvias</b><span>Lluvia diaria y mensual de la cuenca</span>
+    </button>
+    <button class="tile" type="button" data-go-scr="lq">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20h16M6 17V12M10 17V9M14 17v-4"/><path d="M4 9l5-4 5 3 6-5"/></svg></span>
+      <b>Lluvias vs caudales</b><span>Compara la lluvia con el Q aforado</span>
+    </button>
+    <button class="tile" type="button" data-go-scr="tabla">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 10v10"/></svg></span>
+      <b>Tabla de caudales</b><span>Fecha y Q por método y sitio</span>
+    </button>
+    <button class="tile" type="button" data-go-scr="mapa">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></span>
+      <b>Mapa</b><span>Cuenca, río, captaciones y puntos de aforo</span>
+    </button>
+    <button class="tile" type="button" data-go-scr="usuarios" id="tile-usuarios" hidden>
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3 6"/></svg></span>
+      <b>Usuarios</b><span>Crear y administrar cuentas</span>
+    </button>
+  </div>
+  <p class="note" id="sync-note"></p>
+  <p class="foot autor">Elaborado por Ing. Mariana Charry · AURPA</p>
+</section>
+
+<!-- ================= LLUVIAS ================= -->
+<section class="scr page" id="scr-lluvia" hidden>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2>Lluvia en la cuenca</h2>
+      <div class="seg-mini" id="ll-modo"><button type="button" data-v="dia" aria-pressed="true">Diaria</button><button type="button" data-v="mes" aria-pressed="false">Mensual</button></div>
+    </div>
+    <div class="kpis" id="ll-kpis"></div>
+    <div class="chart-box"><canvas id="ll-chart" aria-label="Gráfico de lluvias"></canvas></div>
+    <p class="note" id="ll-note"></p>
+  </div>
+</section>
+
+<!-- ================= LLUVIAS VS CAUDALES ================= -->
+<section class="scr page" id="scr-lq" hidden>
+  <div class="card">
+    <h2>Lluvias vs caudales</h2>
+    <div class="filters">
+      <label class="f">Método <select id="lq-metodo"></select></label>
+      <label class="f">Sitio <select id="lq-sitio"></select></label>
+    </div>
+    <div class="seg-mini" id="lq-rango"><button type="button" data-v="aforos" aria-pressed="true">Periodo de los aforos</button><button type="button" data-v="todo" aria-pressed="false">Todo el año</button></div>
+    <div class="chart-box"><canvas id="lq-chart" aria-label="Lluvia diaria y caudal aforado"></canvas></div>
+    <p class="note" id="lq-note"></p>
+  </div>
+</section>
+
+<!-- ================= TABLA DE CAUDALES ================= -->
+<section class="scr page" id="scr-tabla" hidden>
+  <div class="card">
+    <h2>Tabla de caudales</h2>
+    <div class="filters">
+      <label class="f">Método <select id="tq-metodo"></select></label>
+      <label class="f">Sitio <select id="tq-sitio"></select></label>
+    </div>
+    <div class="tablewrap"><table class="qtable" id="tq-tabla"></table></div>
+    <p class="note" id="tq-note"></p>
+  </div>
+</section>
+
+<!-- ================= MAPA ================= -->
+<section class="scr page" id="scr-mapa" hidden>
+  <div class="placing" id="mp-placing" hidden>
+    <span id="mp-placing-txt"></span>
+    <button class="btn" type="button" id="mp-gps">Usar mi ubicación (GPS)</button>
+    <button class="btn" type="button" id="mp-cancel">Cancelar</button>
+  </div>
+  <div class="map" id="mp-map"></div>
+  <div class="legend-map">
+    <span><i style="border-color:#7b951d"></i>Cuenca río La Paila</span>
+    <span><i style="border-color:#2a7fb0"></i>Río La Paila</span>
+    <span><i style="border-color:#c2721f"></i>Derivación 2</span>
+    <span><i style="border-color:#6b6b6b;border-top-style:dotted"></i>Puntos de captación</span>
+    <span><i style="border-color:#177a34;border-top-width:6px"></i>Puntos de aforo</span>
+  </div>
+  <div class="card">
+    <h2>Puntos de aforo</h2>
+    <div class="sitelist" id="mp-list"></div>
+    <p class="note" id="mp-note"></p>
+  </div>
+</section>
+
+<!-- ================= USUARIOS (administrador) ================= -->
+<section class="scr page" id="scr-usuarios" hidden>
+  <div class="card">
+    <h2>Usuarios</h2>
+    <div id="us-list"></div>
+    <p class="msg-err" id="us-msg" role="alert"></p>
+  </div>
+  <form class="card" id="f-us">
+    <h2>Crear usuario</h2>
+    <div class="fields">
+      <label class="f full">Nombre completo <input id="us-nombre" type="text" required></label>
+      <label class="f">Usuario <span class="unit">(sin espacios ni tildes)</span> <input id="us-user" type="text" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
+      <label class="f">Contraseña inicial <input id="us-pass" type="text" autocomplete="off" required></label>
+      <label class="f">Rol <select id="us-rol"><option value="usuario">Usuario (aforos y consultas)</option><option value="admin">Administrador</option></select></label>
+    </div>
+    <button class="btn primary" type="submit" id="us-btn">Crear usuario</button>
+    <p class="msg-ok" id="us-ok" role="status"></p>
+  </form>
+</section>
+
+<!-- ================= MI CUENTA ================= -->
+<section class="scr page" id="scr-cuenta" hidden>
+  <div class="card">
+    <h2 id="cu-nombre">Mi cuenta</h2>
+    <p class="note" id="cu-info"></p>
+  </div>
+  <form class="card" id="f-clave">
+    <h2>Cambiar contraseña</h2>
+    <label class="f">Contraseña actual <input id="cu-actual" type="password" autocomplete="current-password" required></label>
+    <label class="f">Nueva contraseña <span class="unit">(mínimo 6)</span> <input id="cu-nueva" type="password" autocomplete="new-password" required></label>
+    <button class="btn primary" type="submit">Cambiar contraseña</button>
+    <p class="msg-err" id="cu-msg" role="alert"></p>
+  </form>
+  <button class="btn" type="button" id="cu-salir">Cerrar sesión</button>
+</section>
+
+<div class="wrap scr" id="scr-calc" hidden>
   <header class="top">
     <div class="mark" role="img" aria-label="Logo de AURPA"></div>
     <div>
@@ -510,7 +770,7 @@ body{margin:0}[hidden]{display:none!important}
   <p class="foot autor">Elaborado por Ing. Mariana Charry · AURPA</p>
 </div>
 
-<div class="qbar" id="qbar">
+<div class="qbar" id="qbar" hidden>
   <div>
     <div class="ql">Caudal</div>
     <div class="qv" id="qbar-v">—</div>
@@ -1111,10 +1371,23 @@ body{margin:0}[hidden]{display:none!important}
     });
   });
   function cargarSitios() {
-    if (!DRIVE_URL || !navigator.onLine || /claude/i.test(location.hostname)) return;
-    fetch(DRIVE_URL + "?accion=sitios").then((r) => r.json()).then((j) => {
+    if (!DRIVE_URL || !navigator.onLine || /claude/i.test(location.hostname) || !token()) return;
+    api("sitios").then((j) => {
       if (j && j.ok && Array.isArray(j.sitios)) { mergeSitios(j.sitios); syncPickers(); }
     }).catch(() => {});
+  }
+
+  // ---------- Sesión y llamadas al Drive ----------
+  const SES = "aforo-sesion";
+  const sesionActual = () => { const s = ls.get(SES, null); return s && s.token && (!s.exp || s.exp > Date.now()) ? s : null; };
+  const token = () => (sesionActual() || {}).token || "";
+  let alVencerSesion = () => {};
+  async function api(accion, extra) {
+    const res = await fetch(DRIVE_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ accion, token: token() }, extra || {})) });
+    const j = await res.json();
+    if (j && j.sesion === false) alVencerSesion();
+    return j;
   }
   window.addEventListener("online", cargarSitios);
 
@@ -1126,7 +1399,7 @@ body{margin:0}[hidden]{display:none!important}
   function buildPayload() {
     const r = lastR; if (!r) return null;
     const now = nowParts();
-    const p = { id: newId(), predio: sitioActual(), responsable: $("s-resp").value.trim(),
+    const p = { id: newId(), predio: sitioActual(), responsable: $("s-resp").value.trim() || (sesionActual() || {}).nombre || "",
       metodo: NAMES[current], q_ls: r.Q * 1000, q_m3s: r.Q, fecha: now.fecha, hora: now.hora, sitio: "",
       info: [], tabla: null, pasos: r.steps.map((s) => s.replace(/<[^>]+>/g, "")) };
     if (current === "sec") {
@@ -1158,8 +1431,11 @@ body{margin:0}[hidden]{display:none!important}
   }
 
   async function send(p) {
-    const res = await fetch(DRIVE_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(p) });
+    // El token se pone al enviar (no al guardar en la cola), así un aforo pendiente usa la sesión vigente.
+    const res = await fetch(DRIVE_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({}, p, { accion: "guardar", token: token() })) });
     const j = await res.json();
+    if (j && j.sesion === false) { alVencerSesion(); throw new Error("Sesión vencida"); }   // no fatal: queda en la cola
     if (!j.ok) throw Object.assign(new Error(j.error || "Error del servidor"), { fatal: true });
     return j;
   }
@@ -1168,7 +1444,7 @@ body{margin:0}[hidden]{display:none!important}
     return n ? ` <span class="pend">${n} aforo(s) pendiente(s) de enviar.</span>` : "";
   }
   async function flush() {
-    if (!DRIVE_URL || !navigator.onLine) return;
+    if (!DRIVE_URL || !navigator.onLine || !token()) return;
     let q = ls.get(QKEY, []); if (!q.length) return;
     const left = [];
     for (const p of q) { try { await send(p); } catch (e) { if (!e.fatal) left.push(p); } }
@@ -1200,7 +1476,8 @@ body{margin:0}[hidden]{display:none!important}
       else {
         const q = ls.get(QKEY, []); q.push(p); ls.set(QKEY, q);
         mergeSitios([p.predio]); syncPickers();
-        msg.innerHTML = "Sin conexión. El aforo quedó guardado en este dispositivo y se enviará solo cuando haya señal." + pendingMsg();
+        msg.innerHTML = (token() ? "Sin conexión. El aforo quedó guardado en este dispositivo y se enviará solo cuando haya señal."
+          : "Tu sesión venció. El aforo quedó guardado en este dispositivo y se enviará cuando vuelvas a iniciar sesión.") + pendingMsg();
       }
     } finally { btn.disabled = false; btn.textContent = "Guardar en Drive de AURPA"; }
   });
@@ -1259,6 +1536,442 @@ body{margin:0}[hidden]{display:none!important}
   let start = "sec";
   try { const s = localStorage.getItem("aforo-metodo"); if (s && methods[s]) start = s; } catch (e) {}
   select(start);
+
+  // =====================================================================
+  // APP DE AFOROS AURPA: pantallas, inicio de sesión, lluvias, caudales y mapa
+  // =====================================================================
+  const PREVIEW = /claude/i.test(location.hostname);   // dentro de Claude no hay acceso al Drive
+  const SCR = { login: "Iniciar sesión", inicio: "Inicio", calc: "Calculadora de aforos", lluvia: "Lluvias", lq: "Lluvias vs caudales",
+    tabla: "Tabla de caudales", mapa: "Mapa", usuarios: "Usuarios", cuenta: "Mi cuenta" };
+  const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const MESL = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const fd = (iso) => `${+iso.slice(8, 10)} ${MES[+iso.slice(5, 7) - 1]}`;
+  const fdl = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const onShow = {};
+  let scr = "";
+
+  function go(name, push = true) {
+    const ses = sesionActual();
+    if (!SCR[name]) name = "inicio";
+    if (!PREVIEW && !ses) name = "login";
+    if (name === "login" && (ses || PREVIEW)) name = "inicio";
+    if (name === "usuarios" && !(ses && ses.rol === "admin")) name = "inicio";
+    document.querySelectorAll(".scr").forEach((s) => (s.hidden = s.id !== "scr-" + name));
+    document.body.classList.toggle("on-calc", name === "calc");
+    $("appbar").hidden = name === "login";
+    $("ab-back").hidden = name === "inicio";
+    $("ab-logo").hidden = name !== "inicio";
+    $("ab-title").innerHTML = name === "inicio" ? "<small>Asociación de Usuarios del Río La Paila</small>Aforos AURPA" : `<small>AURPA</small>${SCR[name]}`;
+    scr = name;
+    if (push && location.hash.slice(1) !== name) { try { history.pushState(null, "", "#" + name); } catch (e) {} }
+    window.scrollTo(0, 0);
+    if (onShow[name]) onShow[name]();
+  }
+  const porHash = () => { const h = location.hash.slice(1) || "inicio"; if (h !== scr) go(h, false); };
+  window.addEventListener("popstate", porHash);
+  window.addEventListener("hashchange", porHash);
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-go-scr]"); if (b) go(b.dataset.goScr); });
+  $("ab-back").addEventListener("click", () => go("inicio"));
+  $("ab-user").addEventListener("click", () => go("cuenta"));
+  onShow.calc = () => select(current);
+
+  // ---------- Librerías (se cargan solo cuando se abre la pantalla que las usa) ----------
+  const libs = {};
+  function cargarScript(src) {
+    return libs[src] || (libs[src] = new Promise((ok, no) => {
+      const s = document.createElement("script"); s.src = src; s.onload = ok;
+      s.onerror = () => { delete libs[src]; no(new Error("Sin conexión para cargar el gráfico o el mapa.")); };
+      document.head.appendChild(s);
+    }));
+  }
+  function cargarCSS(href) {
+    return libs[href] || (libs[href] = new Promise((ok) => {
+      const l = document.createElement("link"); l.rel = "stylesheet"; l.href = href;
+      l.onload = ok; l.onerror = ok;   // si falla, el mapa igual intenta mostrarse
+      document.head.appendChild(l);
+    }));
+  }
+  const CHART_JS = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js";
+  const LEAFLET_JS = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+  const LEAFLET_CSS = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+
+  // ---------- Datos: caudales del Drive (con copia en el dispositivo) y lluvias ----------
+  const DKEY = "aforo-datos", LLKEY = "aforo-lluvias";
+  let datos = ls.get(DKEY, null), cargando = null, lluviasCache = ls.get(LLKEY, null);
+  function cargarDatos() {
+    if (PREVIEW || !token() || !navigator.onLine) return Promise.resolve(datos);
+    if (cargando) return cargando;
+    $("sync-note").textContent = "Actualizando datos del Drive…";
+    cargando = api("datos").then((j) => {
+      if (j && j.ok) {
+        datos = { t: Date.now(), aforos: j.aforos || {}, sitios: j.sitios || [], ubicaciones: j.ubicaciones || {} };
+        ls.set(DKEY, datos); mergeSitios(datos.sitios); syncPickers();
+        if (onShow[scr] && scr !== "calc") onShow[scr]();
+      }
+      return datos;
+    }).catch(() => datos).finally(() => { cargando = null; notaSync(); });
+    return cargando;
+  }
+  function notaSync() {
+    $("sync-note").textContent = datos && datos.t
+      ? `Datos del Drive actualizados el ${new Date(datos.t).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).replace(/\.$/, "")}.`
+      : (PREVIEW ? "" : "Aún no se han descargado los datos del Drive.");
+  }
+  async function lluvias() {
+    if (lluviasCache && Date.now() - (lluviasCache._t || 0) < 6 * 36e5) return lluviasCache;
+    try {
+      const r = await fetch("datos-lluvias.json", { cache: "no-cache" });
+      if (!r.ok) throw new Error();
+      lluviasCache = await r.json(); lluviasCache._t = Date.now(); ls.set(LLKEY, lluviasCache);
+    } catch (e) {}
+    return lluviasCache;
+  }
+  const metodosConDatos = () => Object.keys((datos && datos.aforos) || {}).filter((m) => datos.aforos[m].length);
+  const todosLosAforos = () => metodosConDatos().flatMap((m) => datos.aforos[m].map((a) => Object.assign({ m }, a)));
+  function sitiosDe(metodo) {
+    const c = {};
+    ((datos && datos.aforos[metodo]) || []).forEach((a) => (c[a.s] = (c[a.s] || 0) + 1));
+    return Object.keys(c).sort((a, b) => a.localeCompare(b, "es")).map((s) => ({ s, n: c[s] }));
+  }
+  function llenarSelect(sel, opciones, valor) {
+    sel.innerHTML = opciones.map((o) => `<option value="${esc(o.v)}">${esc(o.t)}</option>`).join("");
+    if (opciones.some((o) => o.v === valor)) sel.value = valor;
+  }
+  const sinDatosMsg = () => PREVIEW ? "Los datos del Drive se ven en el link de la app (GitHub)." : (navigator.onLine ? "Cargando datos del Drive…" : "Sin conexión y sin datos guardados en este dispositivo.");
+
+  // ---------- Inicio ----------
+  onShow.inicio = () => {
+    const ses = sesionActual();
+    $("preview-note").hidden = !PREVIEW;
+    $("hello").innerHTML = ses ? `Hola, ${esc(ses.nombre.split(" ")[0])}<small>¿Qué quieres hacer hoy?</small>` : "Bienvenida<small>Vista previa de la app</small>";
+    $("tile-usuarios").hidden = !(ses && ses.rol === "admin");
+    const af = datos ? todosLosAforos() : [];
+    const ult = af.slice().sort((a, b) => (a.f + a.h < b.f + b.h ? 1 : -1))[0];
+    const k = [];
+    k.push(`<div class="kpi"><b>${af.length || "—"}</b><span>aforos guardados</span></div>`);
+    k.push(`<div class="kpi"><b>${ult ? fmt(ult.q, 1) : "—"}</b><span>${ult ? `L/s · último (${fd(ult.f)})` : "último aforo"}</span></div>`);
+    const L = lluviasCache;
+    if (L && L.dias && L.dias.length) {
+      const mesU = L.dias[L.dias.length - 1].f.slice(0, 7);
+      const tot = L.dias.filter((d) => d.f.startsWith(mesU)).reduce((s, d) => s + d.mm, 0);
+      k.push(`<div class="kpi"><b>${fmt(tot, 0)}</b><span>mm de lluvia en ${MESL[+mesU.slice(5) - 1]}</span></div>`);
+    } else k.push(`<div class="kpi"><b>—</b><span>lluvia del último mes</span></div>`);
+    $("kpis").innerHTML = k.join("");
+    notaSync();
+    if (!lluviasCache) lluvias().then(() => { if (scr === "inicio") onShow.inicio(); });
+  };
+
+  // ---------- Lluvias ----------
+  let llModo = "dia", llChart = null;
+  $("ll-modo").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    llModo = b.dataset.v;
+    $("ll-modo").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+    onShow.lluvia();
+  });
+  onShow.lluvia = async () => {
+    const L = await lluvias();
+    if (!L) { $("ll-note").textContent = "No se pudieron cargar las lluvias. Revisa la conexión."; return; }
+    try { await cargarScript(CHART_JS); } catch (e) { $("ll-note").textContent = e.message; return; }
+    const meses = {};
+    L.dias.forEach((d) => { const m = d.f.slice(0, 7); meses[m] = (meses[m] || 0) + d.mm; });
+    const total = L.dias.reduce((s, d) => s + d.mm, 0);
+    const mMax = Object.keys(meses).sort((a, b) => meses[b] - meses[a])[0];
+    const dMax = L.dias.reduce((a, d) => (d.mm > a.mm ? d : a), L.dias[0]);
+    $("ll-kpis").innerHTML = `<div class="kpi"><b>${fmt(total, 0)} mm</b><span>${fd(L.dias[0].f)} – ${fd(L.dias[L.dias.length - 1].f)} 2026</span></div>` +
+      `<div class="kpi"><b>${MESL[+mMax.slice(5) - 1]}</b><span>mes más lluvioso (${fmt(meses[mMax], 0)} mm)</span></div>` +
+      `<div class="kpi"><b>${fmt(dMax.mm, 1)} mm</b><span>día más lluvioso (${fd(dMax.f)})</span></div>`;
+    const dia = llModo === "dia";
+    const labels = dia ? L.dias.map((d) => fd(d.f)) : Object.keys(meses).map((m) => `${MES[+m.slice(5) - 1]} ${m.slice(0, 4)}`);
+    const vals = dia ? L.dias.map((d) => d.mm) : Object.keys(meses).map((m) => Math.round(meses[m] * 10) / 10);
+    if (llChart) llChart.destroy();
+    const ink = cssVar("--muted"), grid = cssVar("--line");
+    llChart = new Chart($("ll-chart"), {
+      type: "bar",
+      data: { labels, datasets: [{ label: dia ? "Lluvia diaria (mm)" : "Lluvia mensual (mm)", data: vals, backgroundColor: cssVar("--river"), borderRadius: dia ? 2 : 6 }] },
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${fmt(c.parsed.y, 1)} mm` } } },
+        scales: { x: { ticks: { color: ink, autoSkip: true, maxRotation: 0 }, grid: { display: false } },
+          y: { title: { display: true, text: "mm", color: ink }, ticks: { color: ink }, grid: { color: grid } } } }
+    });
+    $("ll-note").textContent = `Lluvia diaria de la cuenca: promedio de los pluviómetros ponderado por el área de influencia de cada uno. Fuente: Excel «INFO PLUVIOMETROS DIARIO» de los boletines AURPA 2026 (hoja INFO DIARIA). Se descartó una lectura imposible (Totoró 2, 5 de marzo: 1.027,6 mm).`;
+  };
+
+  // ---------- Lluvias vs caudales ----------
+  let lqChart = null, lqRango = "aforos";
+  $("lq-rango").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    lqRango = b.dataset.v;
+    $("lq-rango").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+    onShow.lq();
+  });
+  $("lq-metodo").addEventListener("change", () => { $("lq-sitio").dataset.v = ""; onShow.lq(); });
+  $("lq-sitio").addEventListener("change", () => { $("lq-sitio").dataset.v = $("lq-sitio").value; onShow.lq(); });
+  onShow.lq = async () => {
+    if (!datos) { $("lq-note").textContent = sinDatosMsg(); cargarDatos(); return; }
+    const ms = metodosConDatos();
+    if (!ms.length) { $("lq-note").textContent = "Todavía no hay aforos guardados."; return; }
+    llenarSelect($("lq-metodo"), ms.map((m) => ({ v: m, t: m })), $("lq-metodo").value || (ms.includes("Molinete") ? "Molinete" : ms[0]));
+    const met = $("lq-metodo").value, sitios = sitiosDe(met);
+    const pref = $("lq-sitio").dataset.v || sitios.slice().sort((a, b) => b.n - a.n)[0].s;
+    llenarSelect($("lq-sitio"), sitios.map((x) => ({ v: x.s, t: `${x.s} (${x.n})` })), pref);
+    const sitio = $("lq-sitio").value;
+    const L = await lluvias();
+    try { await cargarScript(CHART_JS); } catch (e) { $("lq-note").textContent = e.message; return; }
+    const af = datos.aforos[met].filter((a) => a.s === sitio);
+    const qDia = {};
+    af.forEach((a) => { (qDia[a.f] = qDia[a.f] || []).push(a.q); });
+    const rain = {}; ((L && L.dias) || []).forEach((d) => (rain[d.f] = d.mm));
+    const fq = Object.keys(qDia).sort();
+    const fechas = (lqRango === "todo" || !fq.length ? fq.concat(Object.keys(rain)) : fq).sort();
+    if (!fechas.length) return;
+    const sumar = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+    const desde = lqRango === "todo" ? fechas[0] : sumar(fechas[0], -10), hasta = lqRango === "todo" ? fechas[fechas.length - 1] : sumar(fechas[fechas.length - 1], 3);
+    const dias = [];
+    for (let d = desde; d <= hasta; d = sumar(d, 1)) dias.push(d);
+    const ink = cssVar("--muted"), grid = cssVar("--line");
+    if (lqChart) lqChart.destroy();
+    lqChart = new Chart($("lq-chart"), {
+      data: { labels: dias.map(fd), datasets: [
+        { type: "line", label: `Caudal ${sitio} (L/s)`, yAxisID: "q", data: dias.map((d) => qDia[d] ? qDia[d].reduce((s, x) => s + x, 0) / qDia[d].length : null),
+          borderColor: cssVar("--brand"), backgroundColor: cssVar("--brand"), spanGaps: true, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2, tension: .2 },
+        { type: "bar", label: "Lluvia de la cuenca (mm)", yAxisID: "mm", data: dias.map((d) => rain[d] != null ? rain[d] : null), backgroundColor: cssVar("--river"), borderRadius: 2 }
+      ] },
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: 350 }, interaction: { mode: "index", intersect: false },
+        plugins: { legend: { labels: { color: ink, boxWidth: 14 } },
+          tooltip: { filter: (i) => i.parsed.y != null, callbacks: { label: (c) => `${c.dataset.yAxisID === "q" ? "Caudal" : "Lluvia"}: ${fmt(c.parsed.y, 1)} ${c.dataset.yAxisID === "q" ? "L/s" : "mm"}` } } },
+        scales: { x: { ticks: { color: ink, autoSkip: true, maxRotation: 0 }, grid: { display: false } },
+          q: { position: "left", title: { display: true, text: "Caudal (L/s)", color: ink }, ticks: { color: ink }, grid: { color: grid }, beginAtZero: true },
+          mm: { position: "right", title: { display: true, text: "Lluvia (mm)", color: ink }, ticks: { color: ink }, grid: { display: false }, beginAtZero: true } } }
+    });
+    const fuera = af.filter((a) => !(a.f in rain)).length;
+    $("lq-note").textContent = `${af.length} aforo(s) de ${sitio} con ${met.toLowerCase()}. Lluvia: promedio de la cuenca ponderado por el área de cada pluviómetro.` +
+      (fuera ? ` ${fuera} aforo(s) caen en fechas sin datos de lluvia todavía.` : "");
+  };
+
+  // ---------- Tabla de caudales (fecha y Q por método) ----------
+  $("tq-metodo").addEventListener("change", () => { $("tq-sitio").value = ""; onShow.tabla(); });
+  $("tq-sitio").addEventListener("change", () => onShow.tabla());
+  onShow.tabla = () => {
+    if (!datos) { $("tq-tabla").innerHTML = `<tr><td class="empty">${sinDatosMsg()}</td></tr>`; cargarDatos(); return; }
+    const ms = metodosConDatos();
+    if (!ms.length) { $("tq-tabla").innerHTML = `<tr><td class="empty">Todavía no hay aforos guardados.</td></tr>`; return; }
+    llenarSelect($("tq-metodo"), ms.map((m) => ({ v: m, t: m })), $("tq-metodo").value || (ms.includes("Molinete") ? "Molinete" : ms[0]));
+    const met = $("tq-metodo").value, sitios = sitiosDe(met), elegido = $("tq-sitio").value;
+    llenarSelect($("tq-sitio"), [{ v: "", t: "Todos los sitios" }].concat(sitios.map((x) => ({ v: x.s, t: x.s }))), elegido);
+    const filtro = $("tq-sitio").value;
+    let html = "<thead><tr><th>Fecha</th><th>Q (L/s)</th></tr></thead><tbody>";
+    sitios.filter((x) => !filtro || x.s === filtro).forEach((x) => {
+      const filas = datos.aforos[met].filter((a) => a.s === x.s).sort((a, b) => (a.f + a.h < b.f + b.h ? 1 : -1));
+      html += `<tr class="grp"><td colspan="2">${esc(x.s)} <span>· ${filas.length} aforo(s)</span></td></tr>`;
+      html += filas.map((a) => `<tr><td>${fdl(a.f)}${a.h ? ` <span class="note">${esc(a.h)}</span>` : ""}</td><td>${fmt(a.q, 1)}</td></tr>`).join("");
+    });
+    $("tq-tabla").innerHTML = html + "</tbody>";
+    $("tq-note").textContent = `Caudales del método ${met}, tal como están en el resumen del Drive. Se actualiza cada vez que se guarda un aforo.`;
+  };
+
+  // ---------- Mapa ----------
+  const UBIC_BASE = { "Bocatoma (Derivación)": [4.31226, -76.05644], "Bocatoma (Todo el río)": [4.31226, -76.05644] };   // bocatoma (capa INFRAESTRUCTURA)
+  let mapa = null, capaPuntos = null, ubicando = null;
+  const ubicaciones = () => Object.assign({}, UBIC_BASE, (datos && datos.ubicaciones) || {});
+  function sitiosMapa() {
+    const s = new Set(((datos && datos.sitios) || []).concat(Object.keys(UBIC_BASE)));
+    todosLosAforos().forEach((a) => s.add(a.s));
+    return [...s].sort((a, b) => a.localeCompare(b, "es"));
+  }
+  async function capa(url, estilo) {
+    try { const r = await fetch(url); if (!r.ok) throw 0; return window.L.geoJSON(await r.json(), estilo); } catch (e) { return null; }
+  }
+  onShow.mapa = async () => {
+    if (!datos) cargarDatos();
+    try { await Promise.all([cargarCSS(LEAFLET_CSS), cargarScript(LEAFLET_JS)]); } catch (e) { $("mp-note").textContent = e.message; pintarLista(); return; }
+    const Lf = window.L;
+    if (!mapa) {
+      mapa = Lf.map("mp-map", { zoomControl: true, zoomSnap: 0.25 }).setView([4.23, -76.04], 11);
+      if (window.ResizeObserver) new ResizeObserver(() => mapa.invalidateSize()).observe($("mp-map"));
+      const osm = Lf.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" });
+      const sat = Lf.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "© Esri" });
+      osm.addTo(mapa);
+      const capas = {};
+      const cuenca = await capa("mapa/cuenca.geojson", { style: { color: "#7b951d", weight: 2, fillColor: "#7b951d", fillOpacity: .08 } });
+      const rio = await capa("mapa/rio.geojson", { style: { color: "#2a7fb0", weight: 3 } });
+      const der = await capa("mapa/derivacion2.geojson", { style: { color: "#c2721f", weight: 3 } });
+      const cap = await capa("mapa/captaciones.geojson", { pointToLayer: (f, ll) => Lf.circleMarker(ll, { radius: 5, color: "#fff", weight: 1.5, fillColor: "#6b6b6b", fillOpacity: .9 })
+        .bindTooltip(`Punto de captación ${esc(f.properties["ID-Calcul"] || "")}`) });
+      if (cuenca) {
+        cuenca.addTo(mapa); capas["Cuenca río La Paila"] = cuenca;
+        const b = cuenca.getBounds();
+        setTimeout(() => { mapa.invalidateSize(); mapa.fitBounds(b, { padding: [10, 10] }); }, 120);   // medir cuando la pantalla ya está visible
+      }
+      if (rio) { rio.addTo(mapa); capas["Río La Paila"] = rio; }
+      if (der) { der.addTo(mapa); capas["Derivación 2"] = der; }
+      if (cap) { cap.addTo(mapa); capas["Puntos de captación"] = cap; }
+      capaPuntos = Lf.layerGroup().addTo(mapa); capas["Puntos de aforo"] = capaPuntos;
+      Lf.control.layers({ "Mapa": osm, "Satélite": sat }, capas, { collapsed: true }).addTo(mapa);
+      mapa.on("click", (e) => { if (ubicando) guardarUbicacion(ubicando, e.latlng.lat, e.latlng.lng); });
+    } else setTimeout(() => mapa.invalidateSize(), 50);
+    pintarPuntos(); pintarLista();
+  };
+  function aforosDe(sitio) { return todosLosAforos().filter((a) => a.s === sitio).sort((a, b) => (a.f + a.h < b.f + b.h ? 1 : -1)); }
+  function pintarPuntos() {
+    if (!capaPuntos) return;
+    const Lf = window.L, U = ubicaciones(), grupos = {};
+    capaPuntos.clearLayers();
+    sitiosMapa().forEach((s) => { const u = U[s]; if (!u) return; const k = u[0].toFixed(5) + "," + u[1].toFixed(5); (grupos[k] = grupos[k] || { u, sitios: [] }).sitios.push(s); });
+    Object.values(grupos).forEach((g) => {
+      const html = g.sitios.map((s) => {
+        const af = aforosDe(s);
+        const porMetodo = {};
+        af.forEach((a) => (porMetodo[a.m] = porMetodo[a.m] || []).push(a));
+        const cuerpo = Object.keys(porMetodo).map((m) => `<div style="margin-top:4px;font-weight:700">${esc(m)} · ${porMetodo[m].length}</div><table>` +
+          porMetodo[m].slice(0, 6).map((a) => `<tr><td>${fdl(a.f)}</td><td style="text-align:right"><b>${fmt(a.q, 1)}</b> L/s</td></tr>`).join("") + "</table>").join("");
+        return `<div style="margin-bottom:8px"><b style="font-size:15px">${esc(s)}</b>${cuerpo || '<div class="note">Sin aforos guardados</div>'}</div>`;
+      }).join("");
+      Lf.marker(g.u, { icon: Lf.divIcon({ className: "", html: '<div class="aforo-pin"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) })
+        .bindTooltip(g.sitios.join(" · ")).bindPopup(html, { maxWidth: 280 }).addTo(capaPuntos);
+    });
+  }
+  function pintarLista() {
+    const U = ubicaciones(), admin = (sesionActual() || {}).rol === "admin";
+    $("mp-list").innerHTML = sitiosMapa().map((s) => {
+      const af = aforosDe(s), u = U[s];
+      // Conteo separado por método (no se mezclan métodos)
+      const porM = {}; af.forEach((a) => (porM[a.m] = (porM[a.m] || 0) + 1));
+      const det = af.length ? Object.keys(porM).map((m) => `${m}: ${porM[m]}`).join(" · ") : "Sin aforos guardados";
+      const btn = admin ? `<button class="btn" type="button" data-ubicar="${esc(s)}">${u ? "Mover" : "Ubicar"}</button>` : "";
+      return `<div class="site"><i class="pin ${u ? "" : "off"}"></i><div class="txt"><b>${esc(s)}</b><span>${u ? "" : "Sin ubicación · "}${det}</span></div>` +
+        (u ? `<button class="btn" type="button" data-ver="${esc(s)}">Ver</button>` : "") + btn + "</div>";
+    }).join("") || `<p class="empty">${sinDatosMsg()}</p>`;
+    const faltan = sitiosMapa().filter((s) => !U[s]).length;
+    $("mp-note").textContent = faltan ? `${faltan} punto(s) de aforo todavía no tienen ubicación.` + (admin ? " Toca «Ubicar» y luego el lugar en el mapa, o usa el GPS estando en el sitio." : " Un administrador puede ubicarlos.") : "";
+  }
+  $("mp-list").addEventListener("click", (e) => {
+    const v = e.target.closest("[data-ver]"), u = e.target.closest("[data-ubicar]");
+    if (v && mapa) { const p = ubicaciones()[v.dataset.ver]; mapa.flyTo(p, 16); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    if (u) { ubicando = u.dataset.ubicar; $("mp-placing").hidden = false; $("mp-placing-txt").textContent = `Toca en el mapa dónde queda «${ubicando}».`; window.scrollTo({ top: 0, behavior: "smooth" }); }
+  });
+  $("mp-cancel").addEventListener("click", () => { ubicando = null; $("mp-placing").hidden = true; });
+  $("mp-gps").addEventListener("click", () => {
+    if (!ubicando || !navigator.geolocation) return;
+    $("mp-placing-txt").textContent = "Buscando tu ubicación…";
+    navigator.geolocation.getCurrentPosition((p) => guardarUbicacion(ubicando, p.coords.latitude, p.coords.longitude),
+      () => { $("mp-placing-txt").textContent = "No se pudo leer el GPS. Toca el lugar en el mapa."; }, { enableHighAccuracy: true, timeout: 15000 });
+  });
+  async function guardarUbicacion(sitio, lat, lon) {
+    $("mp-placing-txt").textContent = `Guardando la ubicación de «${sitio}»…`;
+    try {
+      const j = await api("ubicar", { sitio, lat: +lat.toFixed(6), lon: +lon.toFixed(6) });
+      if (!j.ok) throw new Error(j.error);
+      datos = datos || { aforos: {}, sitios: [], ubicaciones: {} };
+      datos.ubicaciones = Object.assign({}, datos.ubicaciones, { [sitio]: [lat, lon] }); ls.set(DKEY, datos);
+      ubicando = null; $("mp-placing").hidden = true; pintarPuntos(); pintarLista();
+    } catch (e) { $("mp-placing-txt").textContent = "No se guardó: " + (e.message || "sin conexión"); }
+  }
+
+  // ---------- Usuarios (solo administrador) ----------
+  onShow.usuarios = async () => {
+    $("us-msg").textContent = "";
+    $("us-list").innerHTML = `<p class="empty">Cargando…</p>`;
+    try {
+      const j = await api("usuarios");
+      if (!j.ok) throw new Error(j.error);
+      const yo = (sesionActual() || {}).usuario;
+      $("us-list").innerHTML = j.usuarios.map((u) => `<div class="urow" data-u="${esc(u.usuario)}">
+        <div class="txt"><b>${esc(u.nombre)}<span class="badge">${u.rol === "admin" ? "Administrador" : "Usuario"}</span>${u.activo ? "" : '<span class="badge off">Desactivado</span>'}</b><span>${esc(u.usuario)}</span></div>
+        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button>`}
+      </div>`).join("");
+    } catch (e) { $("us-list").innerHTML = ""; $("us-msg").textContent = e.message || "Sin conexión."; }
+  };
+  $("us-list").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-accion]"); if (!b) return;
+    const row = b.closest("[data-u]"), u = row.dataset.u;
+    if (b.dataset.accion === "clave") {
+      if (row.querySelector(".reset")) return;
+      row.insertAdjacentHTML("beforeend", `<div class="reset" style="display:flex;gap:8px;width:100%"><input type="text" placeholder="Nueva contraseña (mín. 6)" autocomplete="off"><button class="btn primary" type="button" data-accion="guardar-clave">Guardar</button></div>`);
+      row.querySelector(".reset input").focus(); return;
+    }
+    const extra = b.dataset.accion === "guardar-clave" ? { clave: row.querySelector(".reset input").value } : { activo: b.dataset.accion === "on" };
+    b.disabled = true;
+    try { const j = await api("estadoUsuario", Object.assign({ usuario: u }, extra)); if (!j.ok) throw new Error(j.error); onShow.usuarios(); }
+    catch (err) { $("us-msg").textContent = err.message || "Sin conexión."; b.disabled = false; }
+  });
+  $("f-us").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("us-ok").textContent = ""; $("us-msg").textContent = "";
+    $("us-btn").disabled = true;
+    try {
+      const j = await api("crearUsuario", { nombre: $("us-nombre").value, usuario: $("us-user").value.trim().toLowerCase(), clave: $("us-pass").value, rol: $("us-rol").value });
+      if (!j.ok) throw new Error(j.error);
+      $("us-ok").textContent = `Usuario «${$("us-user").value.trim().toLowerCase()}» creado. Compártele su usuario y contraseña.`;
+      $("f-us").reset(); onShow.usuarios();
+    } catch (err) { $("us-msg").textContent = err.message || "Sin conexión."; }
+    finally { $("us-btn").disabled = false; }
+  });
+
+  // ---------- Mi cuenta ----------
+  onShow.cuenta = () => {
+    const s = sesionActual() || {};
+    $("cu-nombre").textContent = s.nombre || "Mi cuenta";
+    $("cu-info").textContent = s.usuario ? `Usuario: ${s.usuario} · ${s.rol === "admin" ? "Administrador" : "Usuario"}` : "";
+    $("cu-msg").textContent = "";
+  };
+  $("f-clave").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const j = await api("cambiarClave", { actual: $("cu-actual").value, nueva: $("cu-nueva").value });
+      if (!j.ok) throw new Error(j.error);
+      $("f-clave").reset(); $("cu-msg").className = "msg-ok"; $("cu-msg").textContent = "Contraseña cambiada.";
+    } catch (err) { $("cu-msg").className = "msg-err"; $("cu-msg").textContent = err.message || "Sin conexión."; }
+  });
+  $("cu-salir").addEventListener("click", () => { ls.set(SES, null); go("login"); prepararLogin(); });
+
+  // ---------- Inicio de sesión ----------
+  async function prepararLogin() {
+    if (PREVIEW) return;
+    try {
+      const j = await api("estado");
+      $("f-admin").hidden = !j.necesitaAdmin; $("f-login").hidden = !!j.necesitaAdmin;
+    } catch (e) { $("f-admin").hidden = true; $("f-login").hidden = false; }
+  }
+  function entrar(j) {
+    ls.set(SES, { token: j.token, usuario: j.usuario, nombre: j.nombre, rol: j.rol, exp: j.exp });
+    iniciales();
+    if (!$("s-resp").value.trim()) $("s-resp").value = j.nombre;
+    go("inicio"); cargarDatos(); cargarSitios(); flush();
+  }
+  function iniciales() {
+    const s = sesionActual();
+    $("ab-user").textContent = s ? s.nombre.split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join("").toUpperCase() : "·";
+  }
+  async function enviarForm(btn, msg, accion, extra) {
+    msg.textContent = ""; btn.disabled = true;
+    try {
+      const j = await api(accion, extra);
+      if (!j.ok) throw new Error(j.error);
+      entrar(j);
+    } catch (err) { msg.textContent = navigator.onLine ? (err.message || "No se pudo conectar con el Drive.") : "Sin conexión. Para entrar necesitas señal; después la calculadora funciona sin internet."; }
+    finally { btn.disabled = false; }
+  }
+  $("f-login").addEventListener("submit", (e) => {
+    e.preventDefault();
+    enviarForm($("l-btn"), $("l-msg"), "login", { usuario: $("l-user").value.trim().toLowerCase(), clave: $("l-pass").value });
+  });
+  $("f-admin").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if ($("a-pass").value !== $("a-pass2").value) { $("a-msg").textContent = "Las contraseñas no coinciden."; return; }
+    enviarForm($("a-btn"), $("a-msg"), "primerAdmin", { nombre: $("a-nombre").value, usuario: $("a-user").value.trim().toLowerCase(), clave: $("a-pass").value });
+  });
+  alVencerSesion = () => {
+    ls.set(SES, null); iniciales();
+    if (!PREVIEW) { go("login"); prepararLogin(); $("l-msg").textContent = "Tu sesión venció. Vuelve a iniciar sesión."; }
+  };
+
+  // ---------- Arranque ----------
+  iniciales();
+  if (!sesionActual() && !PREVIEW) prepararLogin();
+  go(location.hash.slice(1) || "inicio", false);
+  if (sesionActual()) cargarDatos();
 })();
 </script>
 
