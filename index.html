@@ -1665,6 +1665,11 @@ body{margin:0}[hidden]{display:none!important}
     }
     return lluviasCache;
   }
+  // Al abrir la app o iniciar sesión: trae las lluvias del Drive y actualiza la pantalla que esté abierta
+  // (inicio, lluvias o lluvias vs caudales), así un mes recién subido se ve en todas.
+  function refrescarLluvias() {
+    lluvias(true).then(() => { if (["inicio", "lluvia", "lq"].includes(scr) && onShow[scr]) onShow[scr](); });
+  }
   // Mapa de un mes: si se subió al Drive se pide al Drive; si no, el del repositorio.
   const mapasDrive = {};
   async function srcMapa(clave) {
@@ -2151,7 +2156,7 @@ body{margin:0}[hidden]{display:none!important}
     ls.set(SES, { token: j.token, usuario: j.usuario, nombre: j.nombre, rol: j.rol, exp: j.exp });
     iniciales();
     if (!$("s-resp").value.trim()) $("s-resp").value = j.nombre;
-    go("inicio"); cargarDatos(); cargarSitios(); flush();
+    go("inicio"); cargarDatos(); cargarSitios(); flush(); refrescarLluvias();
   }
   function iniciales() {
     const s = sesionActual();
@@ -2184,7 +2189,7 @@ body{margin:0}[hidden]{display:none!important}
   iniciales();
   if (!sesionActual() && !PREVIEW) prepararLogin();
   go(location.hash.slice(1) || "inicio", false);
-  if (sesionActual()) cargarDatos();
+  if (sesionActual()) { cargarDatos(); refrescarLluvias(); }
 })();
 </script>
 
