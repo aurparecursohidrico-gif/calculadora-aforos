@@ -2092,8 +2092,16 @@ body{margin:0}[hidden]{display:none!important}
       const cuenca = await capa("mapa/cuenca.geojson", { style: { color: "#7b951d", weight: 2, fillColor: "#7b951d", fillOpacity: .08 } });
       const rio = await capa("mapa/rio.geojson", { style: { color: "#2a7fb0", weight: 3 } });
       const der = await capa("mapa/derivacion2.geojson", { style: { color: "#c2721f", weight: 3 } });
-      const cap = await capa("mapa/captaciones.geojson", { pointToLayer: (f, ll) => Lf.circleMarker(ll, { radius: 5, color: "#fff", weight: 1.5, fillColor: "#6b6b6b", fillOpacity: .9 })
-        .bindTooltip(`Punto de captación ${esc(f.properties["ID-Calcul"] || "")}`) });
+      // Puntos de captación: al pasar o tocar se ve el predio (campo «NOMBRE PRE» de la capa de QGIS)
+      const cap = await capa("mapa/captaciones.geojson", { pointToLayer: (f, ll) => {
+        const p = f.properties || {}, predio = p.predio || "Punto de captación";
+        const fila = (k, v) => (v === undefined || v === null || v === "" ? "" : `<tr><td>${k}</td><td><b>${esc(String(v))}</b></td></tr>`);
+        return Lf.circleMarker(ll, { radius: 6, color: "#fff", weight: 1.5, fillColor: "#6b6b6b", fillOpacity: .9 })
+          .bindTooltip(esc(predio))
+          .bindPopup(`<b style="font-size:15px">${esc(predio)}</b><div class="note">Punto de captación ${esc(p.id || "")}</div><table>` +
+            fila("Fuente", p.fuente) + fila("Toma", p.nombre_fuente) + fila("Caudal asignado", p.q_asignado !== undefined && p.q_asignado !== null ? `${fmt(+p.q_asignado, 2)} L/s` : "") +
+            fila("Captación", p.tipo) + "</table>", { maxWidth: 260 });
+      } });
       if (cuenca) {
         cuenca.addTo(mapa); capas["Cuenca río La Paila"] = cuenca;
         const b = cuenca.getBounds();
