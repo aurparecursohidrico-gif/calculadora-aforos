@@ -46,6 +46,8 @@ function doPost(e) {
     if (accion === 'cambiarClave') return responder(cambiarClave(ses, a));
     if (accion === 'lluvias') return responder({ ok: true, dias: leerLluvias(), areas: leerAreas(), mapas: listarMapas() });
     if (accion === 'mapaLluvia') return responder(leerMapa(a.mes));
+    if (accion === 'resoluciones') return responder(leerResoluciones());
+    if (accion === 'resolucionPagina') return responder(paginaResolucion(a));
     if (accion === 'ubicar' || accion === 'usuarios' || accion === 'crearUsuario' || accion === 'estadoUsuario' || accion === 'subirLluvias' || accion === 'subirMapa') {
       if (ses.rol !== 'admin') return responder({ ok: false, error: 'Solo un administrador puede hacer esto.' });
       if (accion === 'subirLluvias') return responder(subirLluvias(ses, a));
@@ -408,6 +410,45 @@ function listarSitios() {
   return lista.sort(function (a, b) { return a.localeCompare(b, 'es'); });
 }
 
+// ---------- resoluciones CVC (solo con sesión) ----------
+// Carpeta "Resoluciones (app)" dentro de la carpeta raíz: resoluciones.json + una subcarpeta por resolución
+// con sus páginas (p001.jpg, p002.jpg, …). Nada de esto queda en GitHub: solo se entrega con sesión iniciada.
+var CARPETA_RES = 'Resoluciones (app)';
+function carpetaResoluciones() {
+  var it = carpetaRaiz().getFoldersByName(CARPETA_RES);
+  while (it.hasNext()) { var f = it.next(); if (!f.isTrashed()) return f; }
+  return null;
+}
+function leerResoluciones() {
+  var c = carpetaResoluciones();
+  if (!c) return { ok: true, resoluciones: [], falta: true };
+  var it = c.getFilesByName('resoluciones.json');
+  while (it.hasNext()) {
+    var f = it.next();
+    if (f.isTrashed()) continue;
+    var j = JSON.parse(f.getBlob().getDataAsString('UTF-8'));
+    return { ok: true, resoluciones: j.resoluciones || [] };
+  }
+  return { ok: true, resoluciones: [], falta: true };
+}
+function paginaResolucion(a) {
+  var id = String(a.id || ''), p = Math.floor(Number(a.p));
+  if (!/^[a-z0-9-]{1,60}$/.test(id) || !(p >= 1 && p <= 999)) return { ok: false, error: 'Página no válida.' };
+  var c = carpetaResoluciones();
+  if (!c) return { ok: false, error: 'Falta la carpeta "' + CARPETA_RES + '" en el Drive.' };
+  var nombre = 'p' + ('00' + p).slice(-3) + '.jpg', its = c.getFoldersByName(id);
+  while (its.hasNext()) {
+    var sub = its.next();
+    if (sub.isTrashed()) continue;
+    var itf = sub.getFilesByName(nombre);
+    while (itf.hasNext()) {
+      var f = itf.next();
+      if (!f.isTrashed()) return { ok: true, id: id, p: p, imagen: 'data:image/jpeg;base64,' + Utilities.base64Encode(f.getBlob().getBytes()) };
+    }
+  }
+  return { ok: false, error: 'No se encontró la página ' + p + '.' };
+}
+
 // ---------- carpetas ----------
 function carpetaRaiz() {
   var props = PropertiesService.getScriptProperties();
@@ -447,7 +488,11 @@ function organizarPorMetodo() {
   var metodos = METODOS.map(normalizar);
   var sueltas = [];
   var it = raiz.getFolders();
-  while (it.hasNext()) { var f = it.next(); if (metodos.indexOf(normalizar(f.getName())) < 0) sueltas.push(f); }
+  while (it.hasNext()) {
+    var f = it.next();
+    if (f.isTrashed() || /\(app\)\s*$/i.test(f.getName())) continue;   // papelera y carpetas internas de la app no se mueven
+    if (metodos.indexOf(normalizar(f.getName())) < 0) sueltas.push(f);
+  }
   sueltas.forEach(function (sitio) {
     var metodo = 'Molinete';
     var res = sitio.getFilesByName('Resumen de aforos – ' + sitio.getName());
