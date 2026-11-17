@@ -18,6 +18,11 @@
  * La app pide iniciar sesión: todas las acciones (guardar, consultar datos, ubicar, usuarios) exigen un token.
  * La primera persona que entra, mientras no hay usuarios, crea la cuenta de administrador.
  *
+ * Roles:
+ *   admin    → todo: guardar aforos, subir lluvias, ubicar sitios, crear usuarios y actualizar resoluciones CVC.
+ *   usuario  → solo consulta todas las herramientas, incluidas las resoluciones CVC (no edita nada).
+ *   otros    → solo consulta las herramientas; NO ve las resoluciones CVC (temas legales).
+ *
  * Se instala UNA vez desde la cuenta aurparecursohidrico@gmail.com
  * (Implementar → Nueva implementación → Aplicación web).
  */
@@ -32,7 +37,7 @@ function doPost(e) {
     if (!raw || raw.length > MAX_MAPA) return responder({ ok: false, error: 'Datos vacíos o demasiado grandes.' });
     var a = JSON.parse(raw);
     var accion = String(a.accion || 'guardar');
-    if (accion !== 'subirMapa' && raw.length > MAX_BYTES) return responder({ ok: false, error: 'Datos demasiado grandes.' });
+    if (accion !== 'subirMapa' && accion !== 'subirPaginaResolucion' && raw.length > MAX_BYTES) return responder({ ok: false, error: 'Datos demasiado grandes.' });
 
     // Sin sesión: solo iniciar sesión, consultar si falta el primer administrador o crearlo.
     if (accion === 'login') return responder(login(a));
@@ -46,10 +51,19 @@ function doPost(e) {
     if (accion === 'cambiarClave') return responder(cambiarClave(ses, a));
     if (accion === 'lluvias') return responder({ ok: true, dias: leerLluvias(), areas: leerAreas(), mapas: listarMapas() });
     if (accion === 'mapaLluvia') return responder(leerMapa(a.mes));
-    if (accion === 'resoluciones') return responder(leerResoluciones());
-    if (accion === 'resolucionPagina') return responder(paginaResolucion(a));
-    if (accion === 'ubicar' || accion === 'usuarios' || accion === 'crearUsuario' || accion === 'estadoUsuario' || accion === 'subirLluvias' || accion === 'subirMapa') {
-      if (ses.rol !== 'admin') return responder({ ok: false, error: 'Solo un administrador puede hacer esto.' });
+    if (accion === 'resoluciones' || accion === 'resolucionPagina') {
+      if (ses.rol === 'otros') return responder({ ok: false, error: 'Tu usuario no tiene acceso a las resoluciones CVC.' });
+      if (accion === 'resoluciones') return responder(leerResoluciones());
+      return responder(paginaResolucion(a));
+    }
+    var SOLO_ADMIN = ['ubicar', 'usuarios', 'crearUsuario', 'estadoUsuario', 'subirLluvias', 'subirMapa', 'guardar',
+      'guardarResolucion', 'subirPaginaResolucion', 'recortarResolucion', 'eliminarResolucion'];
+    if (SOLO_ADMIN.indexOf(accion) >= 0) {
+      if (ses.rol !== 'admin') return responder({ ok: false, error: accion === 'guardar' ? 'Solo el administrador puede guardar aforos en el Drive.' : 'Solo un administrador puede hacer esto.' });
+      if (accion === 'guardarResolucion') return responder(guardarResolucion(ses, a));
+      if (accion === 'subirPaginaResolucion') return responder(subirPaginaResolucion(a));
+      if (accion === 'recortarResolucion') return responder(recortarResolucion(a));
+      if (accion === 'eliminarResolucion') return responder(eliminarResolucion(a));
       if (accion === 'subirLluvias') return responder(subirLluvias(ses, a));
       if (accion === 'subirMapa') return responder(subirMapa(ses, a));
       if (accion === 'ubicar') return responder(guardarUbicacion(ses, a));
@@ -197,7 +211,7 @@ function primerAdmin(a) {
 }
 function crearUsuario(a) {
   var u = String(a.usuario || '').trim().toLowerCase(), nombre = limpiar(a.nombre, 60), clave = String(a.clave || '');
-  var rol = a.rol === 'admin' ? 'admin' : 'usuario';
+  var rol = rolValido(a.rol);
   if (!usuarioValido(u)) return { ok: false, error: 'El usuario debe tener de 3 a 30 letras minúsculas, números, punto o guion (sin espacios ni tildes).' };
   if (!nombre) return { ok: false, error: 'Escribe el nombre de la persona.' };
   if (clave.length < 6) return { ok: false, error: 'La contraseña debe tener al menos 6 caracteres.' };
@@ -221,8 +235,10 @@ function estadoUsuario(ses, a) {
     sh.getRange(usr.fila, 5, 1, 2).setValues([[sal, huella(sal, String(a.clave))]]);
   }
   if (typeof a.activo === 'boolean') sh.getRange(usr.fila, 4).setValue(a.activo);
+  if (a.rol) sh.getRange(usr.fila, 3).setValue(rolValido(a.rol));   // cambiar el rol (no el propio: se revisa arriba)
   return { ok: true };
 }
+function rolValido(r) { return r === 'admin' || r === 'otros' ? r : 'usuario'; }
 function cambiarClave(ses, a) {
   var usr = filasUsuarios().filter(function (x) { return x.usuario === ses.usuario; })[0];
   if (!usr || huella(usr.sal, String(a.actual || '')) !== usr.huella) return { ok: false, error: 'La contraseña actual no es correcta.' };
@@ -419,17 +435,108 @@ function carpetaResoluciones() {
   while (it.hasNext()) { var f = it.next(); if (!f.isTrashed()) return f; }
   return null;
 }
-function leerResoluciones() {
-  var c = carpetaResoluciones();
-  if (!c) return { ok: true, resoluciones: [], falta: true };
-  var it = c.getFilesByName('resoluciones.json');
+// Si hay varios resoluciones.json (p. ej. se subió dos veces), vale el más reciente.
+function archivoResoluciones(c) {
+  var it = c.getFilesByName('resoluciones.json'), mejor = null;
   while (it.hasNext()) {
     var f = it.next();
     if (f.isTrashed()) continue;
-    var j = JSON.parse(f.getBlob().getDataAsString('UTF-8'));
-    return { ok: true, resoluciones: j.resoluciones || [] };
+    if (!mejor || f.getLastUpdated() > mejor.getLastUpdated()) mejor = f;
   }
-  return { ok: true, resoluciones: [], falta: true };
+  return mejor;
+}
+function leerResoluciones() {
+  var c = carpetaResoluciones();
+  if (!c) return { ok: true, resoluciones: [], falta: true };
+  var f = archivoResoluciones(c);
+  if (!f) return { ok: true, resoluciones: [], falta: true };
+  var j = JSON.parse(f.getBlob().getDataAsString('UTF-8'));
+  return { ok: true, resoluciones: j.resoluciones || [] };
+}
+
+// ----- Actualizar resoluciones desde la app (solo administrador) -----
+function idResValido(id) { return /^[a-z0-9-]{1,60}$/.test(String(id || '')); }
+function subcarpetaRes(id, crear) {
+  var c = carpetaResoluciones() || (crear ? carpetaRaiz().createFolder(CARPETA_RES) : null);
+  if (!c) return null;
+  var it = c.getFoldersByName(id);
+  while (it.hasNext()) { var f = it.next(); if (!f.isTrashed()) return f; }
+  return crear ? c.createFolder(id) : null;
+}
+function subirPaginaResolucion(a) {
+  var id = String(a.id || ''), p = Math.floor(Number(a.p));
+  if (!idResValido(id) || !(p >= 1 && p <= 999)) return { ok: false, error: 'Página no válida.' };
+  var datos = String(a.imagen || '').replace(/^data:image\/\w+;base64,/, '');
+  if (!datos) return { ok: false, error: 'Falta la imagen.' };
+  var sub = subcarpetaRes(id, true), nombre = 'p' + ('00' + p).slice(-3) + '.jpg';
+  var it = sub.getFilesByName(nombre);
+  while (it.hasNext()) it.next().setTrashed(true);   // reemplaza la página anterior
+  sub.createFile(Utilities.newBlob(Utilities.base64Decode(datos), 'image/jpeg', nombre));
+  return { ok: true };
+}
+// Quita las páginas que sobran cuando el documento nuevo tiene menos páginas que el anterior.
+function recortarResolucion(a) {
+  var id = String(a.id || ''), n = Math.floor(Number(a.paginas));
+  if (!idResValido(id) || !(n >= 1)) return { ok: false, error: 'Datos no válidos.' };
+  var sub = subcarpetaRes(id, false);
+  if (!sub) return { ok: true };
+  var it = sub.getFiles();
+  while (it.hasNext()) {
+    var f = it.next(), m = f.getName().match(/^p(\d{3})\.jpg$/);
+    if (m && Number(m[1]) > n && !f.isTrashed()) f.setTrashed(true);
+  }
+  return { ok: true };
+}
+function escribirResoluciones(lista) {
+  var c = carpetaResoluciones() || carpetaRaiz().createFolder(CARPETA_RES);
+  var f = archivoResoluciones(c), txt = JSON.stringify({ version: 1, resoluciones: lista }, null, 1);
+  if (f) {
+    f.setContent(txt);
+    var it = c.getFilesByName('resoluciones.json');   // deja uno solo
+    while (it.hasNext()) { var g = it.next(); if (g.getId() !== f.getId() && !g.isTrashed()) g.setTrashed(true); }
+  } else c.createFile('resoluciones.json', txt, 'application/json');
+}
+function guardarResolucion(ses, a) {
+  var r = a.res || {}, txt = function (v, n) { return limpiar(v, n || 200); };
+  var out = {
+    id: String(r.id || ''), predio: txt(r.predio, 120), titular: txt(r.titular, 160), numero: txt(r.numero, 80),
+    fecha: String(r.fecha || ''), tipo: txt(r.tipo, 80), uso: txt(r.uso, 120), fuente: txt(r.fuente, 120),
+    caudal: Number(r.caudal), resuelve: Math.floor(Number(r.resuelve)), paginas: Math.floor(Number(r.paginas)),
+    toma: r.toma === 'directa' ? 'directa' : 'derivacion', coordTxt: txt(r.coordTxt, 400), nota: txt(r.nota, 600),
+    captacion: (r.captacion || []).map(function (c) { return txt(c, 80); }).filter(String).slice(0, 10),
+    prop: (r.prop || []).map(Number).filter(function (x) { return x > 0.2 && x < 5; }).slice(0, 999)
+  };
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(r.vigenciaDesde || ''))) out.vigenciaDesde = String(r.vigenciaDesde);
+  if (r.puntos && r.puntos.length) out.puntos = r.puntos.slice(0, 10).map(function (p) {
+    return { lat: Number(p.lat), lon: Number(p.lon), txt: txt(p.txt, 300), q: p.q === undefined ? undefined : Number(p.q), nombre: p.nombre ? txt(p.nombre, 60) : undefined };
+  });
+  if (!idResValido(out.id)) return { ok: false, error: 'Identificador no válido.' };
+  if (!out.predio || !out.numero) return { ok: false, error: 'Faltan el predio o el número de la resolución.' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(out.fecha)) return { ok: false, error: 'Fecha no válida.' };
+  if (!(out.caudal >= 0)) return { ok: false, error: 'Caudal no válido.' };
+  if (!(out.paginas >= 1) || !(out.resuelve >= 1 && out.resuelve <= out.paginas)) return { ok: false, error: 'La página del Resuelve debe estar entre 1 y ' + out.paginas + '.' };
+  Object.keys(out).forEach(function (k) { if (out[k] === '' ) delete out[k]; });
+  out.actualizado = new Date().toISOString().slice(0, 10) + ' · ' + ses.nombre;
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var lista = leerResoluciones().resoluciones, i = -1;
+    lista.forEach(function (x, k) { if (x.id === out.id) i = k; });
+    if (i >= 0) lista[i] = out; else lista.push(out);
+    escribirResoluciones(lista);
+    return { ok: true, id: out.id };
+  } finally { lock.releaseLock(); }
+}
+function eliminarResolucion(a) {
+  var id = String(a.id || '');
+  if (!idResValido(id)) return { ok: false, error: 'Identificador no válido.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var lista = leerResoluciones().resoluciones.filter(function (x) { return x.id !== id; });
+    escribirResoluciones(lista);
+    var sub = subcarpetaRes(id, false);
+    if (sub) sub.setTrashed(true);   // queda en la papelera del Drive (se puede recuperar)
+    return { ok: true };
+  } finally { lock.releaseLock(); }
 }
 function paginaResolucion(a) {
   var id = String(a.id || ''), p = Math.floor(Number(a.p));

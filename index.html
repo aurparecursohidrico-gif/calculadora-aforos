@@ -93,8 +93,9 @@ body { background: var(--bg); color: var(--ink); font-family: var(--font-body); 
 .fields .full { grid-column: 1 / -1; }
 label.f { display: flex; flex-direction: column; justify-content: space-between; gap: 5px; font-size: .85rem; color: var(--muted); font-weight: 700; min-width: 0; }
 .unit { font-weight: 400; }
-input, select { font: 400 16px var(--font-body); color: var(--ink); background: var(--input-bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; width: 100%; min-width: 0; }
-input:focus, select:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px var(--brand-soft); }
+input, select, textarea { font: 400 16px var(--font-body); color: var(--ink); background: var(--input-bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; width: 100%; min-width: 0; }
+input:focus, select:focus, textarea:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px var(--brand-soft); }
+textarea { resize: vertical; line-height: 1.4; }
 .derived { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .9rem; color: var(--muted); }
 .derived strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 
@@ -374,6 +375,7 @@ button.kpi { font: inherit; color: inherit; text-align: left; border: 0; cursor:
 .urow .txt { flex: 1; min-width: 160px; }
 .urow .txt b { display: block; }
 .urow .txt span { font-size: .8rem; color: var(--muted); }
+.us-rolsel { font: 700 .84rem var(--font-body); min-height: 36px; padding: 4px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
 .urow .btn { min-height: 36px; padding: 6px 12px; font-size: .82rem; }
 .badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .72rem; font-weight: 800; background: var(--brand-soft); color: var(--brand); margin-left: 6px; }
 .badge.off { background: var(--warn-soft); color: var(--warn); }
@@ -431,6 +433,10 @@ button.kpi { font: inherit; color: inherit; text-align: left; border: 0; cursor:
 .vs-hoja img { display: block; width: 100%; height: 100%; }
 .vs-hoja .vs-cargando { position: absolute; inset: 0; display: grid; place-items: center; color: #6b6b6b; font-size: .85rem; }
 .vs-hoja .vs-cargando button { font: 700 .85rem var(--font-body); padding: 8px 12px; border-radius: 8px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
+/* Lo que cada rol ve */
+body:not(.es-admin) .solo-admin { display: none !important; }
+body.es-admin .solo-noadmin { display: none !important; }
+body.rol-otros .solo-legal { display: none !important; }
 .vs-cnt { min-width: 84px; text-align: center; font-size: .85rem; font-variant-numeric: tabular-nums; }
 body{margin:0}[hidden]{display:none!important}
 </style>
@@ -500,7 +506,7 @@ body{margin:0}[hidden]{display:none!important}
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></span>
       <b>Mapa</b><span>Cuenca, río, captaciones y puntos de aforo</span>
     </button>
-    <button class="tile" type="button" data-go-scr="res">
+    <button class="tile solo-legal" type="button" data-go-scr="res">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 11h6M9 14h6M9 17h3"/><circle cx="16.5" cy="17.5" r="2.5"/></svg></span>
       <b>Resoluciones CVC</b><span>Concesiones: vigencia, caudal y documento</span>
     </button>
@@ -603,7 +609,36 @@ body{margin:0}[hidden]{display:none!important}
     <div class="res-fil" id="res-fil" role="group" aria-label="Filtrar por estado"></div>
     <div class="res-fil" id="res-toma" role="group" aria-label="Filtrar por tipo de captación"></div>
     <p class="note">Vigencia: 10 años contados desde la fecha de la resolución. «Por vencer» = le queda menos de un año.</p>
+    <button class="btn ghost solo-admin" type="button" id="re-nueva">+ Agregar resolución</button>
   </div>
+  <form class="card solo-admin" id="f-re" hidden novalidate>
+    <h2 id="re-tit">Agregar resolución</h2>
+    <p class="note">Toma los datos de <b>dentro del documento</b> (sello con el número y la fecha), no del nombre del archivo.</p>
+    <div class="fields">
+      <label class="f full">Predio / nombre en la app <input id="re-predio" type="text" maxlength="120" required></label>
+      <label class="f full">Usuario / titular <input id="re-titular" type="text" maxlength="160"></label>
+      <label class="f">No. de resolución <span class="unit">(ej. 0780 No. 0783-045 de 2023)</span><input id="re-numero" type="text" maxlength="80" required></label>
+      <label class="f">Fecha de la resolución <input id="re-fecha" type="date" required></label>
+      <label class="f">Caudal asignado <span class="unit">L/s</span><input id="re-caudal" type="text" inputmode="decimal" required></label>
+      <label class="f">Tipo de captación <select id="re-toma"><option value="derivacion">Derivación</option><option value="directa">Toma directa del río</option></select></label>
+      <label class="f">Página del Resuelve <input id="re-resuelve" type="text" inputmode="numeric" required></label>
+      <label class="f">Contar vigencia desde <span class="unit">(opcional)</span><input id="re-vigdesde" type="date"></label>
+      <label class="f full">Coordenadas <textarea id="re-coord" rows="2" maxlength="400"></textarea></label>
+      <label class="f">Tipo de trámite <input id="re-tipo" type="text" maxlength="80" placeholder="Renovación de concesión"></label>
+      <label class="f">Uso <input id="re-uso" type="text" maxlength="120" placeholder="Agrícola"></label>
+      <label class="f full">Fuente <input id="re-fuente" type="text" maxlength="120" placeholder="Río La Paila"></label>
+      <label class="f full">Punto(s) de captación del mapa <span class="unit">(separados por coma, como se llaman en el mapa)</span><input id="re-cap" type="text" maxlength="300" list="re-caps"></label>
+      <label class="f full">Nota <textarea id="re-nota" rows="2" maxlength="600"></textarea></label>
+      <label class="f full"><span id="re-pdf-lbl">Documento PDF de la resolución</span><input id="re-pdf" type="file" accept="application/pdf,.pdf"></label>
+    </div>
+    <datalist id="re-caps"></datalist>
+    <div class="racc">
+      <button class="btn primary" type="submit" id="re-btn">Guardar resolución</button>
+      <button class="btn" type="button" id="re-cancel">Cancelar</button>
+    </div>
+    <p class="msg-err" id="re-msg" role="alert"></p>
+    <p class="msg-ok" id="re-ok" role="status"></p>
+  </form>
   <div class="res-list" id="res-list"></div>
   <p class="note" id="res-note"></p>
   <p class="foot autor">Elaborado por Ing. Mariana Charry · AURPA</p>
@@ -638,7 +673,7 @@ body{margin:0}[hidden]{display:none!important}
       <label class="f full">Nombre completo <input id="us-nombre" type="text" required></label>
       <label class="f">Usuario <span class="unit">(sin espacios ni tildes)</span> <input id="us-user" type="text" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
       <label class="f">Contraseña inicial <input id="us-pass" type="text" autocomplete="off" required></label>
-      <label class="f">Rol <select id="us-rol"><option value="usuario">Usuario (aforos y consultas)</option><option value="admin">Administrador</option></select></label>
+      <label class="f">Rol <select id="us-rol"><option value="usuario">Usuario (consulta todo, incluidas las resoluciones)</option><option value="otros">Otros (consulta, sin resoluciones CVC)</option><option value="admin">Administrador (edita todo)</option></select></label>
     </div>
     <button class="btn primary" type="submit" id="us-btn">Crear usuario</button>
     <p class="msg-ok" id="us-ok" role="status"></p>
@@ -897,7 +932,8 @@ body{margin:0}[hidden]{display:none!important}
         <summary>Cálculo paso a paso</summary>
         <div class="stack"><ol class="steps" id="steps"></ol></div>
       </details>
-      <div class="save">
+      <p class="hint solo-noadmin">Solo el administrador guarda aforos en el Drive de AURPA. Con tu usuario puedes calcular y consultar.</p>
+      <div class="save solo-admin">
         <p class="hint" id="s-dest"></p>
         <div class="stack" id="s-predio-w" style="gap:10px">
           <label class="f">Sitio de medición
@@ -1607,7 +1643,7 @@ body{margin:0}[hidden]{display:none!important}
     return n ? ` <span class="pend">${n} aforo(s) pendiente(s) de enviar.</span>` : "";
   }
   async function flush() {
-    if (!DRIVE_URL || !navigator.onLine || !token()) return;
+    if (!DRIVE_URL || !navigator.onLine || !token() || (sesionActual() || {}).rol !== "admin") return;
     let q = ls.get(QKEY, []); if (!q.length) return;
     const left = [];
     for (const p of q) { try { await send(p); } catch (e) { if (!e.fatal) left.push(p); } }
@@ -1712,6 +1748,13 @@ body{margin:0}[hidden]{display:none!important}
   const fdl = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
   const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const onShow = {};
+  const ROL_TXT = { admin: "Administrador", usuario: "Usuario", otros: "Otros" };
+  // Clases en <body> según el rol: el administrador edita; «otros» no ve temas legales (resoluciones CVC).
+  function clasesRol() {
+    const r = (sesionActual() || {}).rol || (PREVIEW ? "admin" : "");
+    document.body.classList.toggle("es-admin", r === "admin");
+    document.body.classList.toggle("rol-otros", r === "otros");
+  }
   let scr = "";
 
   function go(name, push = true) {
@@ -1720,6 +1763,8 @@ body{margin:0}[hidden]{display:none!important}
     if (!PREVIEW && !ses) name = "login";
     if (name === "login" && (ses || PREVIEW)) name = "inicio";
     if (name === "usuarios" && !(ses && ses.rol === "admin")) name = "inicio";
+    if (name === "res" && ses && ses.rol === "otros") name = "inicio";
+    clasesRol();
     if (!$("visor").hidden) cerrarVisor(false);
     document.querySelectorAll(".scr").forEach((s) => (s.hidden = s.id !== "scr-" + name));
     document.body.classList.toggle("on-calc", name === "calc");
@@ -2206,7 +2251,7 @@ body{margin:0}[hidden]{display:none!important}
           fila("Fuente", p.fuente) + fila("Toma", p.nombre_fuente) +
           fila("Caudal asignado", p.q_asignado !== undefined && p.q_asignado !== null && p.q_asignado !== "" ? `${fmt(+p.q_asignado, 2)} L/s` : "") +
           fila("Captación", p.tipo) + "</table>" +
-          `<button class="btn" type="button" data-res-cap="${esc(nombre(p))}" style="margin-top:6px;min-height:34px;padding:4px 10px;font-size:13px">Resolución CVC</button></div>`;
+          `<button class="btn solo-legal" type="button" data-res-cap="${esc(nombre(p))}" style="margin-top:6px;min-height:34px;padding:4px 10px;font-size:13px">Resolución CVC</button></div>`;
         cap = Lf.layerGroup(Object.values(grupos).map((g) => {
           const n = g.items.length;
           const titulo = n > 1 ? `<div class="note" style="margin-bottom:6px">${n} predios captan en este punto</div>` : "";
@@ -2344,6 +2389,11 @@ body{margin:0}[hidden]{display:none!important}
           <button class="btn primary" type="button" data-ver-res="${esc(r.id)}" data-p="1">Ver resolución (${r.paginas} pág.)</button>
           <button class="btn" type="button" data-ver-res="${esc(r.id)}" data-p="${r.resuelve}">Ir al Resuelve · pág. ${r.resuelve}</button>
         </div>
+        <div class="racc solo-admin">
+          <button class="btn" type="button" data-editar-res="${esc(r.id)}">Editar datos o cambiar PDF</button>
+          <button class="btn" type="button" data-borrar-res="${esc(r.id)}">Eliminar</button>
+        </div>
+        ${r.actualizado ? `<p class="note solo-admin">Actualizada: ${esc(r.actualizado)}</p>` : ""}
       </div>
     </details>`;
   }
@@ -2513,6 +2563,118 @@ body{margin:0}[hidden]{display:none!important}
     else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); $("vs-prev").click(); }
   });
 
+  // ---------- Actualizar resoluciones (solo administrador) ----------
+  // El PDF se convierte en imágenes por página aquí mismo (pdf.js) y se sube página por página al Drive.
+  const PDF_JS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+  const PDF_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  let reEditando = null;
+  const slug = (s) => normRes(s).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "resolucion";
+  async function capsDelMapa() {
+    try {
+      const g = await (await fetch(`mapa/captaciones.geojson?v=${CAPAS_V}`)).json();
+      const n = [...new Set(g.features.map((f) => (f.properties || {}).predio).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+      $("re-caps").innerHTML = n.map((x) => `<option value="${esc(x)}">`).join("");
+    } catch (e) {}
+  }
+  const coordsDe = (r) => r.puntos && r.puntos.length ? r.puntos.map((p) => p.txt).join("\n") : (r.coordTxt || "");
+  function abrirFormRes(r) {
+    reEditando = r || null;
+    const f = $("f-re"); f.reset(); f.hidden = false;
+    $("re-msg").textContent = ""; $("re-ok").textContent = "";
+    $("re-tit").textContent = r ? `Editar: ${r.predio}` : "Agregar resolución";
+    $("re-pdf-lbl").textContent = r ? `Cambiar el PDF (opcional; hoy tiene ${r.paginas} páginas)` : "Documento PDF de la resolución";
+    if (r) {
+      const v = { predio: r.predio, titular: r.titular, numero: r.numero, fecha: r.fecha, caudal: String(r.caudal).replace(".", ","),
+        toma: r.toma || "derivacion", resuelve: r.resuelve, vigdesde: r.vigenciaDesde, tipo: r.tipo, uso: r.uso, fuente: r.fuente,
+        cap: (r.captacion || []).join(", "), nota: r.nota, coord: coordsDe(r) };
+      Object.keys(v).forEach((k) => { if (v[k] !== undefined && v[k] !== null) $("re-" + k).value = v[k]; });
+    }
+    capsDelMapa();
+    f.scrollIntoView({ block: "start" }); $("re-predio").focus();
+  }
+  $("re-nueva").addEventListener("click", () => abrirFormRes(null));
+  $("re-cancel").addEventListener("click", () => { $("f-re").hidden = true; reEditando = null; });
+  async function pdfAPaginas(file, avance) {
+    await cargarScript(PDF_JS);
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER;
+    const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    const out = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      avance(`Preparando página ${i} de ${pdf.numPages}…`);
+      const pg = await pdf.getPage(i), v1 = pg.getViewport({ scale: 1 });
+      const vp = pg.getViewport({ scale: 1100 / v1.width });
+      const cv = document.createElement("canvas"); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      const cx = cv.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, cv.width, cv.height);
+      await pg.render({ canvasContext: cx, viewport: vp, intent: "print" }).promise;   // «print»: no se detiene si la pestaña queda en segundo plano
+      out.push({ imagen: cv.toDataURL("image/jpeg", 0.72), prop: +(cv.height / cv.width).toFixed(3) });
+      pg.cleanup();
+    }
+    return out;
+  }
+  $("f-re").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("re-msg"), ok = $("re-ok"), btn = $("re-btn"), val = (k) => $("re-" + k).value.trim();
+    msg.textContent = ""; ok.textContent = "";
+    const r = reEditando, file = $("re-pdf").files[0];
+    const caudal = num(val("caudal")), resuelve = parseInt(val("resuelve"), 10);
+    if (!val("predio") || !val("numero")) { msg.textContent = "Escribe el predio y el número de la resolución."; return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(val("fecha"))) { msg.textContent = "Escribe la fecha de la resolución."; return; }
+    if (!isFinite(caudal) || caudal < 0) { msg.textContent = "Escribe el caudal asignado en L/s."; return; }
+    if (!(resuelve >= 1)) { msg.textContent = "Escribe la página donde está el Resuelve."; return; }
+    if (!r && !file) { msg.textContent = "Elige el PDF de la resolución."; return; }
+    if (file && file.size > 80 * 1024 * 1024) { msg.textContent = "El PDF es muy pesado (más de 80 MB)."; return; }
+    let id = r ? r.id : slug(val("predio") + "-" + val("numero"));
+    if (!r && resCache && resCache.lista.some((x) => x.id === id)) id = (id + "-" + Date.now().toString(36)).slice(0, 60);
+    const coord = val("coord");
+    const res = { id, predio: val("predio"), titular: val("titular"), numero: val("numero"), fecha: val("fecha"), caudal,
+      toma: $("re-toma").value, resuelve, vigenciaDesde: val("vigdesde"), tipo: val("tipo"), uso: val("uso"), fuente: val("fuente"),
+      nota: val("nota"), captacion: val("cap").split(",").map((s) => s.trim()).filter(Boolean),
+      paginas: r ? r.paginas : 0, prop: r ? r.prop : [] };
+    // Si las coordenadas no se tocaron se conservan los puntos (con latitud y longitud); si cambiaron, queda el texto.
+    if (r && r.puntos && r.puntos.length && coord === coordsDe(r)) res.puntos = r.puntos; else res.coordTxt = coord;
+    btn.disabled = true; $("re-cancel").disabled = true;
+    const avance = (txt) => (ok.textContent = txt);
+    try {
+      if (file) {
+        const pags = await pdfAPaginas(file, avance);
+        if (resuelve > pags.length) throw new Error(`El PDF tiene ${pags.length} páginas: la del Resuelve no puede ser la ${resuelve}.`);
+        for (let i = 0; i < pags.length; i++) {
+          avance(`Subiendo página ${i + 1} de ${pags.length} al Drive…`);
+          let j = null;
+          for (let intento = 0; intento < 3 && !(j && j.ok); intento++) {
+            try { j = await api("subirPaginaResolucion", { id, p: i + 1, imagen: pags[i].imagen }); } catch (err) { j = null; }
+          }
+          if (!j || !j.ok) throw new Error((j && j.error) || `No se pudo subir la página ${i + 1}. Revisa la conexión e inténtalo otra vez.`);
+        }
+        await api("recortarResolucion", { id, paginas: pags.length });
+        res.paginas = pags.length; res.prop = pags.map((x) => x.prop);
+        [...pagCache.keys()].filter((k) => k.indexOf(id + "/") === 0).forEach((k) => pagCache.delete(k));
+      } else if (resuelve > res.paginas) throw new Error(`El documento tiene ${res.paginas} páginas: la del Resuelve no puede ser la ${resuelve}.`);
+      avance("Guardando los datos…");
+      const j = await api("guardarResolucion", { res });
+      if (!j || !j.ok) throw new Error((j && j.error) || "No se pudo guardar.");
+      $("f-re").hidden = true; reEditando = null;
+      resCache = null; await onShow.res();
+      $("res-note").textContent = `Resolución «${res.predio}» guardada en el Drive.`;
+      const d = document.getElementById("res-" + id); if (d) { d.open = true; d.scrollIntoView({ block: "start" }); }
+    } catch (err) { msg.textContent = err.message || "Sin conexión."; ok.textContent = ""; }
+    finally { btn.disabled = false; $("re-cancel").disabled = false; }
+  });
+  document.addEventListener("click", async (e) => {
+    const ed = e.target.closest("[data-editar-res]");
+    if (ed && resCache) { const r = resCache.lista.find((x) => x.id === ed.dataset.editarRes); if (r) abrirFormRes(r); return; }
+    const bo = e.target.closest("[data-borrar-res]");
+    if (bo && resCache) {
+      const r = resCache.lista.find((x) => x.id === bo.dataset.borrarRes); if (!r) return;
+      if (!confirm(`¿Eliminar la resolución de «${r.predio}» (${r.numero})?\n\nSus páginas quedan en la papelera del Drive por 30 días.`)) return;
+      bo.disabled = true;
+      try {
+        const j = await api("eliminarResolucion", { id: r.id }); if (!j.ok) throw new Error(j.error);
+        resCache = null; await onShow.res(); $("res-note").textContent = `Se eliminó «${r.predio}».`;
+      } catch (err) { $("res-note").textContent = err.message || "Sin conexión."; bo.disabled = false; }
+    }
+  });
+
   // ---------- Usuarios (solo administrador) ----------
   onShow.usuarios = async () => {
     $("us-msg").textContent = "";
@@ -2522,8 +2684,8 @@ body{margin:0}[hidden]{display:none!important}
       if (!j.ok) throw new Error(j.error);
       const yo = (sesionActual() || {}).usuario;
       $("us-list").innerHTML = j.usuarios.map((u) => `<div class="urow" data-u="${esc(u.usuario)}">
-        <div class="txt"><b>${esc(u.nombre)}<span class="badge">${u.rol === "admin" ? "Administrador" : "Usuario"}</span>${u.activo ? "" : '<span class="badge off">Desactivado</span>'}</b><span>${esc(u.usuario)}</span></div>
-        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button>`}
+        <div class="txt"><b>${esc(u.nombre)}<span class="badge">${ROL_TXT[u.rol] || "Usuario"}</span>${u.activo ? "" : '<span class="badge off">Desactivado</span>'}</b><span>${esc(u.usuario)}</span></div>
+        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<select class="us-rolsel" aria-label="Rol de ${esc(u.nombre)}">${["usuario", "otros", "admin"].map((r) => `<option value="${r}"${(u.rol || "usuario") === r ? " selected" : ""}>${ROL_TXT[r]}</option>`).join("")}</select><button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button>`}
       </div>`).join("");
     } catch (e) { $("us-list").innerHTML = ""; $("us-msg").textContent = e.message || "Sin conexión."; }
   };
@@ -2539,6 +2701,13 @@ body{margin:0}[hidden]{display:none!important}
     b.disabled = true;
     try { const j = await api("estadoUsuario", Object.assign({ usuario: u }, extra)); if (!j.ok) throw new Error(j.error); onShow.usuarios(); }
     catch (err) { $("us-msg").textContent = err.message || "Sin conexión."; b.disabled = false; }
+  });
+  $("us-list").addEventListener("change", async (e) => {
+    const s = e.target.closest(".us-rolsel"); if (!s) return;
+    const u = s.closest("[data-u]").dataset.u;
+    s.disabled = true; $("us-msg").textContent = "";
+    try { const j = await api("estadoUsuario", { usuario: u, rol: s.value }); if (!j.ok) throw new Error(j.error); onShow.usuarios(); }
+    catch (err) { $("us-msg").textContent = err.message || "Sin conexión."; s.disabled = false; }
   });
   $("f-us").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -2557,7 +2726,7 @@ body{margin:0}[hidden]{display:none!important}
   onShow.cuenta = () => {
     const s = sesionActual() || {};
     $("cu-nombre").textContent = s.nombre || "Mi cuenta";
-    $("cu-info").textContent = s.usuario ? `Usuario: ${s.usuario} · ${s.rol === "admin" ? "Administrador" : "Usuario"}` : "";
+    $("cu-info").textContent = s.usuario ? `Usuario: ${s.usuario} · ${ROL_TXT[s.rol] || "Usuario"}` : "";
     $("cu-msg").textContent = "";
   };
   $("f-clave").addEventListener("submit", async (e) => {
