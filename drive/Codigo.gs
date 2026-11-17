@@ -759,7 +759,7 @@ function reconstruirResumenMetodo() {
             var file = DriveApp.getFileById(m[1]);
             if (file.isTrashed()) { borrar.push(i + 2); return; }
             var p = file.getParents(); if (p.hasNext()) carpeta = p.next().getUrl();
-          } catch (e) { borrar.push(i + 2); return; }   // el archivo ya no existe
+          } catch (e) { /* si no se puede abrir el archivo, el aforo se conserva (solo se quitan los que están en la papelera) */ }
         }
         if (id && vistos[id]) return;
         if (id) vistos[id] = 1;
