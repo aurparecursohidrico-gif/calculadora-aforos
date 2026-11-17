@@ -2075,8 +2075,15 @@ body{margin:0}[hidden]{display:none!important}
     todosLosAforos().forEach((a) => s.add(a.s));
     return [...s].sort((a, b) => a.localeCompare(b, "es"));
   }
+  // Versión de las capas del mapa: subirla cada vez que se vuelva a exportar una capa de QGIS,
+  // así ningún celular se queda con la copia vieja guardada.
+  const CAPAS_V = "2026-11-17b";
   async function capa(url, estilo) {
-    try { const r = await fetch(url); if (!r.ok) throw 0; return window.L.geoJSON(await r.json(), estilo); } catch (e) { return null; }
+    try {
+      const r = await fetch(`${url}?v=${CAPAS_V}`, { cache: "no-cache" });
+      if (!r.ok) throw 0;
+      return window.L.geoJSON(await r.json(), estilo);
+    } catch (e) { return null; }
   }
   onShow.mapa = async () => {
     if (!datos) cargarDatos();
@@ -2094,7 +2101,9 @@ body{margin:0}[hidden]{display:none!important}
       const der = await capa("mapa/derivacion2.geojson", { style: { color: "#c2721f", weight: 3 } });
       // Puntos de captación: al pasar o tocar se ve el predio (campo «NOMBRE PRE» de la capa de QGIS)
       const cap = await capa("mapa/captaciones.geojson", { pointToLayer: (f, ll) => {
-        const p = f.properties || {}, predio = p.predio || "Punto de captación";
+        const p = f.properties || {};
+        p.id = p.id || p["ID-Calcul"] || "";
+        const predio = p.predio || p["NOMBRE PRE"] || (p.id ? `Punto de captación ${p.id}` : "Punto de captación");
         const fila = (k, v) => (v === undefined || v === null || v === "" ? "" : `<tr><td>${k}</td><td><b>${esc(String(v))}</b></td></tr>`);
         return Lf.circleMarker(ll, { radius: 6, color: "#fff", weight: 1.5, fillColor: "#6b6b6b", fillOpacity: .9 })
           .bindTooltip(esc(predio))
