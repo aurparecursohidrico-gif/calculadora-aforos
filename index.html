@@ -2099,18 +2099,32 @@ body{margin:0}[hidden]{display:none!important}
       const cuenca = await capa("mapa/cuenca.geojson", { style: { color: "#7b951d", weight: 2, fillColor: "#7b951d", fillOpacity: .08 } });
       const rio = await capa("mapa/rio.geojson", { style: { color: "#2a7fb0", weight: 3 } });
       const der = await capa("mapa/derivacion2.geojson", { style: { color: "#c2721f", weight: 3 } });
-      // Puntos de captación: al pasar o tocar se ve el predio (campo «NOMBRE PRE» de la capa de QGIS)
-      const cap = await capa("mapa/captaciones.geojson", { pointToLayer: (f, ll) => {
-        const p = f.properties || {};
-        p.id = p.id || p["ID-Calcul"] || "";
-        const predio = p.predio || p["NOMBRE PRE"] || (p.id ? `Punto de captación ${p.id}` : "Punto de captación");
+      // Puntos de captación: al pasar o tocar se ve el predio (campo «NOMBRE PRE» de la capa de QGIS).
+      // Varios predios pueden captar en el mismo punto (p. ej. Medios 3 y Medios 5): se agrupan en un solo
+      // punto con su número y la ficha los muestra todos, para que ninguno quede tapado.
+      let cap = null;
+      try {
+        const r = await fetch(`mapa/captaciones.geojson?v=${CAPAS_V}`, { cache: "no-cache" });
+        if (!r.ok) throw 0;
+        const gj = await r.json(), grupos = {};
+        gj.features.forEach((f) => {
+          const [lon, lat] = f.geometry.coordinates, k = lat.toFixed(5) + "," + lon.toFixed(5);
+          (grupos[k] = grupos[k] || { ll: [lat, lon], items: [] }).items.push(f.properties || {});
+        });
         const fila = (k, v) => (v === undefined || v === null || v === "" ? "" : `<tr><td>${k}</td><td><b>${esc(String(v))}</b></td></tr>`);
-        return Lf.circleMarker(ll, { radius: 6, color: "#fff", weight: 1.5, fillColor: "#6b6b6b", fillOpacity: .9 })
-          .bindTooltip(esc(predio))
-          .bindPopup(`<b style="font-size:15px">${esc(predio)}</b><div class="note">Punto de captación ${esc(p.id || "")}</div><table>` +
-            fila("Fuente", p.fuente) + fila("Toma", p.nombre_fuente) + fila("Caudal asignado", p.q_asignado !== undefined && p.q_asignado !== null ? `${fmt(+p.q_asignado, 2)} L/s` : "") +
-            fila("Captación", p.tipo) + "</table>", { maxWidth: 260 });
-      } });
+        const nombre = (p) => p.predio || p["NOMBRE PRE"] || `Punto de captación ${p.id || p["ID-Calcul"] || ""}`.trim();
+        const ficha = (p) => `<div style="margin-bottom:8px"><b style="font-size:15px">${esc(nombre(p))}</b><div class="note">Punto de captación ${esc(p.id || p["ID-Calcul"] || "")}</div><table>` +
+          fila("Fuente", p.fuente) + fila("Toma", p.nombre_fuente) +
+          fila("Caudal asignado", p.q_asignado !== undefined && p.q_asignado !== null && p.q_asignado !== "" ? `${fmt(+p.q_asignado, 2)} L/s` : "") +
+          fila("Captación", p.tipo) + "</table></div>";
+        cap = Lf.layerGroup(Object.values(grupos).map((g) => {
+          const n = g.items.length;
+          const titulo = n > 1 ? `<div class="note" style="margin-bottom:6px">${n} predios captan en este punto</div>` : "";
+          return Lf.circleMarker(g.ll, { radius: n > 1 ? 9 : 6, color: "#fff", weight: n > 1 ? 2.5 : 1.5, fillColor: "#6b6b6b", fillOpacity: .9 })
+            .bindTooltip(g.items.map((p) => esc(nombre(p))).join(" · ") + (n > 1 ? ` (${n})` : ""))
+            .bindPopup(titulo + g.items.map(ficha).join(""), { maxWidth: 280, maxHeight: 320 });
+        }));
+      } catch (e) { cap = null; }
       if (cuenca) {
         cuenca.addTo(mapa); capas["Cuenca río La Paila"] = cuenca;
         const b = cuenca.getBounds();
