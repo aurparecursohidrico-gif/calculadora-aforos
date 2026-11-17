@@ -264,7 +264,9 @@ function aforosPorMetodo() {
     var n = sh.getLastRow() - 1; if (n < 1) continue;
     var enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
     var c = function (t) { return enc.indexOf(t); };
-    out[METODOS[k]] = sh.getRange(2, 1, n, enc.length).getValues().map(function (r) {
+    var valores = sh.getRange(2, 1, n, enc.length).getValues();
+    completarFechasFaltantes(sh, valores, enc);
+    out[METODOS[k]] = valores.map(function (r) {
       var fe = r[c('Fecha')], ho = r[c('Hora')];
       return {
         s: String(r[c('Sitio')] || ''),
@@ -276,6 +278,58 @@ function aforosPorMetodo() {
     }).filter(function (x) { return x.s && x.f && x.q !== ''; });
   }
   return out;
+}
+
+// Filas de un resumen que quedaron sin Fecha (u Hora): se recuperan del nombre de la carpeta del aforo
+// («<Sitio> – 2026-08-24») y del nombre del archivo («Aforo 08h15 · …»), y se escriben en la hoja.
+function completarFechasFaltantes(sh, valores, enc) {
+  var cF = enc.indexOf('Fecha'), cH = enc.indexOf('Hora'), cA = enc.indexOf('Archivo'), cC = enc.indexOf('Carpeta'), cQ = enc.indexOf('Caudal (L/s)');
+  if (cF < 0) return 0;
+  var arreglos = 0;
+  valores.forEach(function (r, i) {
+    if (r[cF] !== '' && r[cF] !== null) return;
+    if (cQ >= 0 && r[cQ] === '') return;
+    var carpeta = null, archivo = null, m;
+    try {
+      if (cC >= 0 && (m = String(r[cC] || '').match(/folders\/([A-Za-z0-9_-]+)/))) carpeta = DriveApp.getFolderById(m[1]);
+      if (cA >= 0 && (m = String(r[cA] || '').match(/\/d\/([A-Za-z0-9_-]+)/))) {
+        archivo = DriveApp.getFileById(m[1]);
+        if (!carpeta) { var p = archivo.getParents(); if (p.hasNext()) carpeta = p.next(); }
+      }
+    } catch (e) {}
+    var f = carpeta && carpeta.getName().match(/(\d{4})-(\d{2})-(\d{2})\s*$/);
+    if (!f) return;
+    var fecha = new Date(Number(f[1]), Number(f[2]) - 1, Number(f[3]));
+    sh.getRange(i + 2, cF + 1).setValue(fecha).setNumberFormat('dd/MM/yyyy');
+    r[cF] = fecha;
+    var h = archivo && archivo.getName().match(/(\d{1,2})h(\d{2})/);
+    if (h && cH >= 0 && (r[cH] === '' || r[cH] === null)) {
+      var hora = ('0' + h[1]).slice(-2) + ':' + h[2];
+      sh.getRange(i + 2, cH + 1).setNumberFormat('@').setValue(hora);
+      r[cH] = hora;
+    }
+    arreglos++;
+  });
+  return arreglos;
+}
+// Ejecutar a mano (opcional): completa las fechas que falten también en el resumen de cada sitio.
+function completarFechas() {
+  var metodos = METODOS.map(normalizar), it = carpetaRaiz().getFolders();
+  while (it.hasNext()) {
+    var metodo = it.next(); if (metodo.isTrashed() || metodos.indexOf(normalizar(metodo.getName())) < 0) continue;
+    var hojas = [hojaResumenMetodo(metodo)], sitios = metodo.getFolders();
+    while (sitios.hasNext()) {
+      var s = sitios.next(); if (s.isTrashed()) continue;
+      var f = s.getFilesByName('Resumen de aforos – ' + s.getName());
+      if (f.hasNext()) hojas.push(SpreadsheetApp.open(f.next()).getSheets()[0]);
+    }
+    hojas.forEach(function (sh) {
+      var n = sh.getLastRow() - 1; if (n < 1) return;
+      var enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
+      var k = completarFechasFaltantes(sh, sh.getRange(2, 1, n, enc.length).getValues(), enc);
+      if (k) Logger.log(sh.getParent().getName() + ': ' + k + ' fecha(s) recuperada(s)');
+    });
+  }
 }
 
 // =====================================================================
@@ -775,6 +829,7 @@ function reconstruirResumenMetodo() {
     if (destino.getLastRow() > 1) destino.getRange(2, 1, destino.getLastRow() - 1, destino.getLastColumn()).clearContent();
     if (filas.length) destino.getRange(2, 1, filas.length, encD.length).setValues(filas);
     numerar(destino);
+    if (filas.length) completarFechasFaltantes(destino, destino.getRange(2, 1, filas.length, encD.length).getValues(), encD);
     Logger.log(metodo.getName() + ': ' + filas.length + ' aforos');
   }
 }
