@@ -390,6 +390,10 @@ button.kpi { font: inherit; color: inherit; text-align: left; border: 0; cursor:
 .rcard { background: var(--surface); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-left: 5px solid var(--brand); border-radius: var(--radius); box-shadow: 0 1px 2px rgba(20, 40, 20, .04), 0 6px 20px rgba(20, 40, 20, .05); }
 .rcard.porvencer { border-left-color: var(--warn); }
 .rcard.vencida { border-left-color: var(--point); }
+.rcard .rsum { display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 12px; }
+.rcard .rsum .txt { flex: 1; min-width: 0; }
+.rcard .rsum .txt b { display: block; font-size: 1rem; line-height: 1.25; }
+.rcard .rsum .txt span { font-size: .8rem; color: var(--ink-2); }
 .rcard summary { display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 12px; cursor: pointer; list-style: none; }
 .rcard summary::-webkit-details-marker { display: none; }
 .rcard summary::after { content: "›"; font-size: 1.5rem; line-height: 1; color: var(--muted); transition: transform .15s; }
@@ -2211,7 +2215,7 @@ body{margin:0}[hidden]{display:none!important}
   }
   // Versión de las capas del mapa: subirla cada vez que se vuelva a exportar una capa de QGIS,
   // así ningún celular se queda con la copia vieja guardada.
-  const CAPAS_V = "2026-11-17b";
+  const CAPAS_V = "2026-11-17c";
   async function capa(url, estilo) {
     try {
       const r = await fetch(`${url}?v=${CAPAS_V}`, { cache: "no-cache" });
@@ -2251,7 +2255,9 @@ body{margin:0}[hidden]{display:none!important}
           fila("Fuente", p.fuente) + fila("Toma", p.nombre_fuente) +
           fila("Caudal asignado", p.q_asignado !== undefined && p.q_asignado !== null && p.q_asignado !== "" ? `${fmt(+p.q_asignado, 2)} L/s` : "") +
           fila("Captación", p.tipo) + "</table>" +
-          `<button class="btn solo-legal" type="button" data-res-cap="${esc(nombre(p))}" style="margin-top:6px;min-height:34px;padding:4px 10px;font-size:13px">Resolución CVC</button></div>`;
+          (p.legal
+            ? `<div class="solo-legal" style="margin-top:6px;padding:6px 10px;border-radius:8px;background:#fdf1df;color:#9a5800;font-weight:800;font-size:13px">${esc(p.legal)} · sin resolución CVC</div></div>`
+            : `<button class="btn solo-legal" type="button" data-res-cap="${esc(nombre(p))}" style="margin-top:6px;min-height:34px;padding:4px 10px;font-size:13px">Resolución CVC</button></div>`);
         cap = Lf.layerGroup(Object.values(grupos).map((g) => {
           const n = g.items.length;
           const titulo = n > 1 ? `<div class="note" style="margin-bottom:6px">${n} predios captan en este punto</div>` : "";
@@ -2425,11 +2431,20 @@ body{margin:0}[hidden]{display:none!important}
     const grupos = [["derivacion", "Derivación"], ["directa", "Toma directa del río"]]
       .map(([k, t]) => ({ t, items: ver.filter((r) => r.toma === k) })).filter((g) => g.items.length);
     const sinTipo = ver.filter((r) => r.toma !== "derivacion" && r.toma !== "directa");
-    lista.innerHTML = !ver.length ? `<div class="card"><p class="empty">Ninguna resolución coincide con la búsqueda.</p></div>`
-      : grupos.map((g) => `<h2 class="sec-tit">${g.t} · ${g.items.length}</h2>` + g.items.map(htmlRes).join("")).join("") + sinTipo.map(htmlRes).join("");
+    const noReg = resFiltro === "todas" && resToma === "todas" ? tomasNoReg.filter((x) => !q || normRes(x.predio).includes(q)) : [];
+    lista.innerHTML = (!ver.length && !noReg.length) ? `<div class="card"><p class="empty">Ninguna resolución coincide con la búsqueda.</p></div>`
+      : grupos.map((g) => `<h2 class="sec-tit">${g.t} · ${g.items.length}</h2>` + g.items.map(htmlRes).join("")).join("") + sinTipo.map(htmlRes).join("") +
+        (noReg.length ? `<h2 class="sec-tit">Tomas no regularizadas · ${noReg.length}</h2>` + noReg.map((x) =>
+          `<div class="rcard porvencer"><div class="rsum"><div class="txt"><b>${esc(x.predio)}</b><span>Sin resolución CVC${x.q !== "" && x.q !== undefined && x.q !== null ? ` · ${fmt(+x.q, 2)} L/s según la capa del mapa` : ""}</span></div><span class="rest">No regularizada</span></div></div>`).join("") : "");
     abiertos.forEach((id) => { const d = document.getElementById(id); if (d) d.open = true; });
     $("res-note").textContent = `${R.lista.length} resoluciones en el Drive de AURPA.`;
   }
+  // Tomas sin resolución (campo «legal» en la capa de captaciones del mapa)
+  let tomasNoReg = [];
+  fetch(`mapa/captaciones.geojson?v=${CAPAS_V}`).then((r) => r.json()).then((g) => {
+    tomasNoReg = g.features.map((f) => f.properties || {}).filter((p) => p.legal).map((p) => ({ predio: p.predio, q: p.q_asignado }));
+    if (scr === "res" && resCache) pintarResoluciones();
+  }).catch(() => {});
   onShow.res = async () => {
     if (PREVIEW) { $("res-list").innerHTML = `<div class="card"><p class="empty">Las resoluciones se ven con sesión iniciada en el link de la app (GitHub).</p></div>`; return; }
     if (!resCache) $("res-list").innerHTML = `<div class="card"><p class="empty">Cargando resoluciones del Drive…</p></div>`;
