@@ -237,7 +237,7 @@ function aforosPorMetodo() {
   var out = {}, metodos = METODOS.map(normalizar);
   var it = carpetaRaiz().getFolders();
   while (it.hasNext()) {
-    var carpeta = it.next();
+    var carpeta = it.next(); if (carpeta.isTrashed()) continue;   // lo que está en la papelera no cuenta
     var k = metodos.indexOf(normalizar(carpeta.getName()));
     if (k < 0) continue;
     var f = carpeta.getFilesByName('Resumen de aforos – ' + carpeta.getName());
@@ -397,10 +397,10 @@ function listarSitios() {
   var agregar = function (nombre) { var k = normalizar(nombre); if (!vistos[k]) { vistos[k] = 1; lista.push(nombre); } };
   var it = raiz.getFolders();
   while (it.hasNext()) {
-    var f = it.next();
+    var f = it.next(); if (f.isTrashed()) continue;
     if (metodos.indexOf(normalizar(f.getName())) >= 0) {
       var it2 = f.getFolders();
-      while (it2.hasNext()) agregar(it2.next().getName());
+      while (it2.hasNext()) { var g = it2.next(); if (!g.isTrashed()) agregar(g.getName()); }
     } else if (!/\(app\)\s*$/i.test(f.getName())) {   // carpetas internas de la app (p. ej. "Mapas de lluvias (app)") no son sitios
       agregar(f.getName());
     }
@@ -432,7 +432,7 @@ function buscarOCrear(padre, nombre) {
   var clave = normalizar(nombre);
   var it = padre.getFolders();
   while (it.hasNext()) {
-    var f = it.next();
+    var f = it.next(); if (f.isTrashed()) continue;
     if (normalizar(f.getName()) === clave) return f;   // "La Esperanza" = "la esperanza "
   }
   return padre.createFolder(nombre);
@@ -564,12 +564,12 @@ function completarMiras() {
   };
   var it = carpetaRaiz().getFolders();
   while (it.hasNext()) {
-    var metodo = it.next();
+    var metodo = it.next(); if (metodo.isTrashed()) continue;
     if (metodos.indexOf(normalizar(metodo.getName())) < 0) continue;
     completar(hojaResumenMetodo(metodo));
     var sitios = metodo.getFolders();
     while (sitios.hasNext()) {
-      var s = sitios.next();
+      var s = sitios.next(); if (s.isTrashed()) continue;
       var f = s.getFilesByName('Resumen de aforos – ' + s.getName());
       if (f.hasNext()) completar(conMira(conNumero(SpreadsheetApp.open(f.next()).getSheets()[0])));
     }
@@ -583,14 +583,14 @@ function reconstruirResumenMetodo() {
   var metodos = METODOS.map(normalizar);
   var it = carpetaRaiz().getFolders();
   while (it.hasNext()) {
-    var metodo = it.next();
+    var metodo = it.next(); if (metodo.isTrashed()) continue;
     if (metodos.indexOf(normalizar(metodo.getName())) < 0) continue;
     var destino = hojaResumenMetodo(metodo);
     var encD = destino.getRange(1, 1, 1, destino.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
     var filas = [], vistos = {};
     var sitios = metodo.getFolders();
     while (sitios.hasNext()) {
-      var s = sitios.next();
+      var s = sitios.next(); if (s.isTrashed()) continue;
       var f = s.getFilesByName('Resumen de aforos – ' + s.getName());
       if (!f.hasNext()) continue;
       var sh = conMira(conNumero(SpreadsheetApp.open(f.next()).getSheets()[0]));
@@ -668,7 +668,7 @@ function numerarTodo() {
   var recorrer = function (padre) {
     var it = padre.getFolders();
     while (it.hasNext()) {
-      var carpeta = it.next();
+      var carpeta = it.next(); if (carpeta.isTrashed()) continue;
       var f = carpeta.getFilesByName('Resumen de aforos – ' + carpeta.getName());
       if (f.hasNext()) numerar(conNumero(SpreadsheetApp.open(f.next()).getSheets()[0]));
       if (metodos.indexOf(normalizar(carpeta.getName())) >= 0) recorrer(carpeta);

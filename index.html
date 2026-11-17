@@ -1411,6 +1411,13 @@ body{margin:0}[hidden]{display:none!important}
     sitios.sort((a, b) => a.localeCompare(b, "es"));
     ls.set(SKEY, sitios);
   }
+  // Cuando llega la lista del Drive, manda ella: se reemplaza la lista (así un sitio borrado en el Drive
+  // desaparece del celular). Se conservan los sitios base y los de aforos que aún esperan enviarse.
+  function sitiosDelDrive(lista) {
+    sitios = [];
+    const pendientes = (ls.get("aforo-pendientes", []) || []).map((p) => p && p.predio);
+    mergeSitios(SITIOS_BASE.concat(lista || [], pendientes));
+  }
   mergeSitios(SITIOS_BASE.concat(ls.get(SKEY, [])));
 
   const pickers = [
@@ -1441,7 +1448,7 @@ body{margin:0}[hidden]{display:none!important}
   function cargarSitios() {
     if (!DRIVE_URL || !navigator.onLine || /claude/i.test(location.hostname) || !token()) return;
     api("sitios").then((j) => {
-      if (j && j.ok && Array.isArray(j.sitios)) { mergeSitios(j.sitios); syncPickers(); }
+      if (j && j.ok && Array.isArray(j.sitios)) { sitiosDelDrive(j.sitios); syncPickers(); }
     }).catch(() => {});
   }
 
@@ -1674,7 +1681,7 @@ body{margin:0}[hidden]{display:none!important}
     cargando = api("datos").then((j) => {
       if (j && j.ok) {
         datos = { t: Date.now(), aforos: j.aforos || {}, sitios: j.sitios || [], ubicaciones: j.ubicaciones || {} };
-        ls.set(DKEY, datos); mergeSitios(datos.sitios); syncPickers();
+        ls.set(DKEY, datos); sitiosDelDrive(datos.sitios); syncPickers();
         if (onShow[scr] && scr !== "calc") onShow[scr]();
       }
       return datos;
