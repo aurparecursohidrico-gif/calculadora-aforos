@@ -601,6 +601,7 @@ body{margin:0}[hidden]{display:none!important}
   <div class="card">
     <input class="res-buscar" id="res-q" type="search" placeholder="Buscar predio o No. de resolución" aria-label="Buscar resolución" autocomplete="off">
     <div class="res-fil" id="res-fil" role="group" aria-label="Filtrar por estado"></div>
+    <div class="res-fil" id="res-toma" role="group" aria-label="Filtrar por tipo de captación"></div>
     <p class="note">Vigencia: 10 años contados desde la fecha de la resolución. «Por vencer» = le queda menos de un año.</p>
   </div>
   <div class="res-list" id="res-list"></div>
@@ -2288,7 +2289,7 @@ body{margin:0}[hidden]{display:none!important}
   // Las resoluciones (datos y páginas escaneadas) están en el Drive de AURPA, carpeta «Resoluciones (app)».
   // Solo se piden con sesión iniciada y no se guardan en el dispositivo.
   const RES_ANOS = 10;
-  let resCache = null, resCargando = null, resFiltro = "todas", resBuscar = null;
+  let resCache = null, resCargando = null, resFiltro = "todas", resToma = "todas", resBuscar = null;
   const EST_TXT = { vigente: "Vigente", porvencer: "Por vencer", vencida: "Vencida" };
   function sumarAnos(iso, n) { return `${+iso.slice(0, 4) + n}${iso.slice(4)}`.replace(/-02-29$/, "-02-28"); }
   function estadoRes(r) {
@@ -2334,6 +2335,7 @@ body{margin:0}[hidden]{display:none!important}
           ${dato("Tipo", esc(r.tipo || ""))}
           ${dato("Uso", esc(r.uso || ""))}
           ${dato("Usuario / titular", esc(r.titular || ""), "ancho")}
+          ${dato("Captación", r.toma === "directa" ? "Toma directa del río" : r.toma === "derivacion" ? "Derivación" : "", "")}
           ${dato("Fuente", esc(r.fuente || ""), "ancho")}
           ${r.vigenciaDesde ? dato("Vigencia contada desde", fdl(r.vigenciaDesde), "ancho") : ""}
           ${dato("Nota", esc(r.nota || ""), "ancho")}
@@ -2350,7 +2352,7 @@ body{margin:0}[hidden]{display:none!important}
     if (!R) return;
     if (R.falta || !R.lista.length) {
       lista.innerHTML = `<div class="card"><p class="empty">Aún no está la carpeta «Resoluciones (app)» en el Drive de AURPA.</p></div>`;
-      $("res-fil").innerHTML = ""; return;
+      $("res-fil").innerHTML = ""; $("res-toma").innerHTML = ""; return;
     }
     const conEst = R.lista.map((r) => Object.assign({ e: estadoRes(r) }, r));
     const n = { todas: conEst.length, vigente: 0, porvencer: 0, vencida: 0 };
@@ -2358,12 +2360,21 @@ body{margin:0}[hidden]{display:none!important}
     $("res-fil").innerHTML = [["todas", "Todas"], ["vigente", "Vigentes"], ["porvencer", "Por vencer"], ["vencida", "Vencidas"]]
       .filter(([k]) => k === "todas" || n[k])
       .map(([k, t]) => `<button type="button" data-res-fil="${k}" aria-pressed="${resFiltro === k}">${t}<b>${n[k]}</b></button>`).join("");
+    // Tipo de captación: derivación o toma directa del río
+    const nt = { todas: conEst.length, derivacion: 0, directa: 0 };
+    conEst.forEach((r) => { if (nt[r.toma] !== undefined) nt[r.toma]++; });
+    $("res-toma").innerHTML = (nt.derivacion || nt.directa) ? [["todas", "Todas las tomas"], ["derivacion", "Derivación"], ["directa", "Toma directa"]]
+      .map(([k, t]) => `<button type="button" data-res-toma="${k}" aria-pressed="${resToma === k}">${t}<b>${nt[k]}</b></button>`).join("") : "";
     const q = normRes($("res-q").value.trim());
-    const ver = conEst.filter((r) => (resFiltro === "todas" || r.e.est === resFiltro) &&
+    const ver = conEst.filter((r) => (resFiltro === "todas" || r.e.est === resFiltro) && (resToma === "todas" || r.toma === resToma) &&
       (!q || normRes([r.predio, r.titular, r.numero, (r.captacion || []).join(" ")].join(" ")).includes(q)))
       .sort((a, b) => a.predio.localeCompare(b.predio, "es"));
     const abiertos = new Set([...lista.querySelectorAll("details[open]")].map((d) => d.id));
-    lista.innerHTML = ver.length ? ver.map(htmlRes).join("") : `<div class="card"><p class="empty">Ninguna resolución coincide con la búsqueda.</p></div>`;
+    const grupos = [["derivacion", "Derivación"], ["directa", "Toma directa del río"]]
+      .map(([k, t]) => ({ t, items: ver.filter((r) => r.toma === k) })).filter((g) => g.items.length);
+    const sinTipo = ver.filter((r) => r.toma !== "derivacion" && r.toma !== "directa");
+    lista.innerHTML = !ver.length ? `<div class="card"><p class="empty">Ninguna resolución coincide con la búsqueda.</p></div>`
+      : grupos.map((g) => `<h2 class="sec-tit">${g.t} · ${g.items.length}</h2>` + g.items.map(htmlRes).join("")).join("") + sinTipo.map(htmlRes).join("");
     abiertos.forEach((id) => { const d = document.getElementById(id); if (d) d.open = true; });
     $("res-note").textContent = `${R.lista.length} resoluciones en el Drive de AURPA.`;
   }
@@ -2378,7 +2389,7 @@ body{margin:0}[hidden]{display:none!important}
       const orig = resBuscar, nom = normRes(resBuscar); resBuscar = null;
       const hall = resCache.lista.filter((r) => (r.captacion || []).some((c) => normRes(c) === nom));
       if (!hall.length) { $("res-note").textContent = `No hay resolución cargada para «${orig}».`; $("res-note").scrollIntoView({ block: "center" }); return; }
-      resFiltro = "todas"; $("res-q").value = ""; pintarResoluciones();
+      resFiltro = "todas"; resToma = "todas"; $("res-q").value = ""; pintarResoluciones();
       document.querySelectorAll(".rcard[open]").forEach((d) => (d.open = false));
       hall.forEach((r) => { const d = document.getElementById("res-" + r.id); if (d) d.open = true; });
       const d = document.getElementById("res-" + hall[0].id); if (d) d.scrollIntoView({ block: "start" });
@@ -2386,6 +2397,7 @@ body{margin:0}[hidden]{display:none!important}
   };
   $("res-q").addEventListener("input", () => pintarResoluciones());
   $("res-fil").addEventListener("click", (e) => { const b = e.target.closest("[data-res-fil]"); if (b) { resFiltro = b.dataset.resFil; pintarResoluciones(); } });
+  $("res-toma").addEventListener("click", (e) => { const b = e.target.closest("[data-res-toma]"); if (b) { resToma = b.dataset.resToma; pintarResoluciones(); } });
   document.addEventListener("click", (e) => {
     const c = e.target.closest("[data-res-cap]");
     if (c) { resBuscar = c.dataset.resCap; if (scr === "res") onShow.res(); else go("res"); return; }
@@ -2472,7 +2484,7 @@ body{margin:0}[hidden]{display:none!important}
   function olvidarResoluciones() {   // al cerrar sesión no queda nada de las resoluciones en memoria
     cerrarVisor(false); resCache = null;
     pagCache.forEach((pr) => pr.then((u) => URL.revokeObjectURL(u), () => {})); pagCache.clear();
-    $("res-list").innerHTML = ""; $("res-fil").innerHTML = "";
+    $("res-list").innerHTML = ""; $("res-fil").innerHTML = ""; $("res-toma").innerHTML = "";
   }
   $("vs-pages").addEventListener("scroll", () => {
     const box = $("vs-pages"), y = box.scrollTop + box.clientHeight / 3;
