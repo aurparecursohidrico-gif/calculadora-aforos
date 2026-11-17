@@ -2354,7 +2354,9 @@ body{margin:0}[hidden]{display:none!important}
       lista.innerHTML = `<div class="card"><p class="empty">Aún no está la carpeta «Resoluciones (app)» en el Drive de AURPA.</p></div>`;
       $("res-fil").innerHTML = ""; $("res-toma").innerHTML = ""; return;
     }
-    const conEst = R.lista.map((r) => Object.assign({ e: estadoRes(r) }, r));
+    // Si el resoluciones.json del Drive es de una versión anterior (sin "toma"), se usa esta clasificación.
+    const DIRECTA = ["acuavalle", "macumba", "medios-2", "medios-5", "medios-5-santa-ines", "medios-reyes-alto", "medios-reyes-bajo", "res-372-2019", "res-667-2018"];
+    const conEst = R.lista.map((r) => Object.assign({ e: estadoRes(r) }, r, { toma: r.toma || (DIRECTA.includes(r.id) ? "directa" : "derivacion") }));
     const n = { todas: conEst.length, vigente: 0, porvencer: 0, vencida: 0 };
     conEst.forEach((r) => n[r.e.est]++);
     $("res-fil").innerHTML = [["todas", "Todas"], ["vigente", "Vigentes"], ["porvencer", "Por vencer"], ["vencida", "Vencidas"]]
