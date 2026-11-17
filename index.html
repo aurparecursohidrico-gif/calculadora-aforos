@@ -2309,8 +2309,9 @@ body{margin:0}[hidden]{display:none!important}
     if (resCargando) return resCargando;
     resCargando = api("resoluciones").then((j) => {
       if (!j || !j.ok) throw new Error((j && j.error) || "No se pudieron leer las resoluciones.");
-      resCache = { lista: j.resoluciones || [], falta: !!j.falta };
-      return resCache;
+      const r = { lista: j.resoluciones || [], falta: !!j.falta };
+      if (!r.falta && r.lista.length) resCache = r;   // si la carpeta aún no está, se vuelve a consultar la próxima vez
+      return r;
     }).finally(() => { resCargando = null; });
     return resCargando;
   }
@@ -2344,8 +2345,8 @@ body{margin:0}[hidden]{display:none!important}
       </div>
     </details>`;
   }
-  function pintarResoluciones() {
-    const R = resCache, lista = $("res-list");
+  function pintarResoluciones(datosRes) {
+    const R = datosRes || resCache, lista = $("res-list");
     if (!R) return;
     if (R.falta || !R.lista.length) {
       lista.innerHTML = `<div class="card"><p class="empty">Aún no está la carpeta «Resoluciones (app)» en el Drive de AURPA.</p></div>`;
@@ -2369,9 +2370,10 @@ body{margin:0}[hidden]{display:none!important}
   onShow.res = async () => {
     if (PREVIEW) { $("res-list").innerHTML = `<div class="card"><p class="empty">Las resoluciones se ven con sesión iniciada en el link de la app (GitHub).</p></div>`; return; }
     if (!resCache) $("res-list").innerHTML = `<div class="card"><p class="empty">Cargando resoluciones del Drive…</p></div>`;
-    try { await cargarResoluciones(); }
+    let R; try { R = await cargarResoluciones(); }
     catch (e) { $("res-list").innerHTML = `<div class="card"><p class="empty">${esc(navigator.onLine ? e.message : "Sin conexión: las resoluciones se consultan en línea.")}</p></div>`; return; }
-    pintarResoluciones();
+    pintarResoluciones(R);
+    if (!resCache) return;
     if (resBuscar) {   // se llegó desde un punto de captación del mapa
       const orig = resBuscar, nom = normRes(resBuscar); resBuscar = null;
       const hall = resCache.lista.filter((r) => (r.captacion || []).some((c) => normRes(c) === nom));
@@ -2382,7 +2384,7 @@ body{margin:0}[hidden]{display:none!important}
       const d = document.getElementById("res-" + hall[0].id); if (d) d.scrollIntoView({ block: "start" });
     }
   };
-  $("res-q").addEventListener("input", pintarResoluciones);
+  $("res-q").addEventListener("input", () => pintarResoluciones());
   $("res-fil").addEventListener("click", (e) => { const b = e.target.closest("[data-res-fil]"); if (b) { resFiltro = b.dataset.resFil; pintarResoluciones(); } });
   document.addEventListener("click", (e) => {
     const c = e.target.closest("[data-res-cap]");
