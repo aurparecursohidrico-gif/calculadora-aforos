@@ -1990,7 +1990,19 @@ body{margin:0}[hidden]{display:none!important}
   };
 
   // ---------- Mapa ----------
-  const UBIC_BASE = { "Bocatoma (Derivación)": [4.31226, -76.05644], "Bocatoma (Todo el río)": [4.31226, -76.05644] };   // bocatoma (capa INFRAESTRUCTURA)
+  // Ubicación de los puntos de aforo: la bocatoma sale de la capa INFRAESTRUCTURA de QGIS;
+  // los demás, de las fotos de campo con coordenadas. Un administrador puede moverlos desde el mapa.
+  const UBIC_BASE = {
+    "Bocatoma (Derivación)": [4.31226, -76.05644],
+    "Bocatoma (Todo el río)": [4.31226, -76.05644],
+    "Puente Cumba": [4.309858, -76.048900],                         // foto 20-04-2026
+    "Final Medios Reyes Bajo": [4.336428, -76.092096],              // foto 29-04-2026
+    "Puente La Luisa": [4.336395, -76.102724],                      // foto 03-07-2026
+    "Estación limnigráfica La Sorpresa": [4.297738, -76.046232],    // foto 27-07-2026
+    "Antes Medios Reyes": [4.323140, -76.058806],                   // foto 05-08-2026
+    "Paso Elevado Guabitos": [4.312945, -76.108703],                // foto 14-08-2026
+    "Canal reservorios": [4.314361, -76.084721],                    // foto 24-08-2026
+  };
   let mapa = null, capaPuntos = null, ubicando = null;
   const ubicaciones = () => Object.assign({}, UBIC_BASE, (datos && datos.ubicaciones) || {});
   function sitiosMapa() {
