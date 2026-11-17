@@ -1360,11 +1360,13 @@ body{margin:0}[hidden]{display:none!important}
   const SITIOS_BASE = ["Antes Medios Reyes", "Bocatoma (Derivación)", "Bocatoma (Todo el río)", "Canal reservorios",
     "Estación limnigráfica La Sorpresa", "Final Medios Reyes Bajo", "Paso Elevado Guabitos", "Puente Cumba", "Puente La Luisa"];
   const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+  const esCarpetaApp = (s) => /\(app\)\s*$/i.test(String(s || ""));   // carpetas internas del Drive, no son sitios
   const NUEVO = "__nuevo__";
   let sitios = [];
   function mergeSitios(lista) {
+    sitios = sitios.filter((s) => !esCarpetaApp(s));
     const vistos = new Set(sitios.map(norm));
-    lista.forEach((s) => { s = String(s || "").trim(); if (s && !vistos.has(norm(s))) { vistos.add(norm(s)); sitios.push(s); } });
+    lista.forEach((s) => { s = String(s || "").trim(); if (s && !esCarpetaApp(s) && !vistos.has(norm(s))) { vistos.add(norm(s)); sitios.push(s); } });
     sitios.sort((a, b) => a.localeCompare(b, "es"));
     ls.set(SKEY, sitios);
   }
@@ -2006,7 +2008,7 @@ body{margin:0}[hidden]{display:none!important}
   let mapa = null, capaPuntos = null, ubicando = null;
   const ubicaciones = () => Object.assign({}, UBIC_BASE, (datos && datos.ubicaciones) || {});
   function sitiosMapa() {
-    const s = new Set(((datos && datos.sitios) || []).concat(Object.keys(UBIC_BASE)));
+    const s = new Set(((datos && datos.sitios) || []).filter((x) => !esCarpetaApp(x)).concat(Object.keys(UBIC_BASE)));
     todosLosAforos().forEach((a) => s.add(a.s));
     return [...s].sort((a, b) => a.localeCompare(b, "es"));
   }

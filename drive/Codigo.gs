@@ -401,7 +401,7 @@ function listarSitios() {
     if (metodos.indexOf(normalizar(f.getName())) >= 0) {
       var it2 = f.getFolders();
       while (it2.hasNext()) agregar(it2.next().getName());
-    } else {
+    } else if (!/\(app\)\s*$/i.test(f.getName())) {   // carpetas internas de la app (p. ej. "Mapas de lluvias (app)") no son sitios
       agregar(f.getName());
     }
   }
