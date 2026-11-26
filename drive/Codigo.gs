@@ -20,7 +20,7 @@
  *
  * Roles:
  *   admin    → todo: guardar aforos, subir lluvias, ubicar sitios, crear usuarios y actualizar resoluciones CVC.
- *   usuario  → solo consulta todas las herramientas, incluidas las resoluciones CVC (no edita nada).
+ *   usuario  → guarda aforos y consulta todas las herramientas, incluidas las resoluciones CVC (no edita lo demás).
  *   otros    → solo consulta las herramientas; NO ve las resoluciones CVC (temas legales).
  *
  * Se instala UNA vez desde la cuenta aurparecursohidrico@gmail.com
@@ -56,10 +56,11 @@ function doPost(e) {
       if (accion === 'resoluciones') return responder(leerResoluciones());
       return responder(paginaResolucion(a));
     }
-    var SOLO_ADMIN = ['ubicar', 'usuarios', 'crearUsuario', 'estadoUsuario', 'subirLluvias', 'subirMapa', 'guardar',
+    if (accion === 'guardar' && ses.rol === 'otros') return responder({ ok: false, error: 'Tu usuario no puede guardar aforos en el Drive.' });
+    var SOLO_ADMIN = ['ubicar', 'usuarios', 'crearUsuario', 'estadoUsuario', 'subirLluvias', 'subirMapa',
       'guardarResolucion', 'subirPaginaResolucion', 'recortarResolucion', 'eliminarResolucion'];
     if (SOLO_ADMIN.indexOf(accion) >= 0) {
-      if (ses.rol !== 'admin') return responder({ ok: false, error: accion === 'guardar' ? 'Solo el administrador puede guardar aforos en el Drive.' : 'Solo un administrador puede hacer esto.' });
+      if (ses.rol !== 'admin') return responder({ ok: false, error: 'Solo un administrador puede hacer esto.' });
       if (accion === 'guardarResolucion') return responder(guardarResolucion(ses, a));
       if (accion === 'subirPaginaResolucion') return responder(subirPaginaResolucion(a));
       if (accion === 'recortarResolucion') return responder(recortarResolucion(a));

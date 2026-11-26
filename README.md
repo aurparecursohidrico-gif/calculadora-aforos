@@ -5,7 +5,7 @@ App de aforos de la Asociación de Usuarios del Río La Paila (AURPA). Elaborada
 **Link de la app:** https://aurparecursohidrico-gif.github.io/calculadora-aforos/
 
 - **Inicio de sesión** con usuario y contraseña. El administrador crea las cuentas.
-- **Calculadora de aforos:** molinete (sección media, río o canal), volumétrico, flotador, vertederos y canal Parshall. El administrador guarda cada aforo en el Drive de AURPA, por método y por sitio.
+- **Calculadora de aforos:** molinete (sección media, río o canal), volumétrico, flotador, vertederos y canal Parshall. Los roles Administrador y Usuario guardan cada aforo en el Drive de AURPA (con lugar, fecha y hora), por método y por sitio.
 - **Lluvias:** lluvia diaria y mensual de la cuenca, con el mapa de lluvias de cada mes.
 - **Lluvias vs caudales:** compara la lluvia con el caudal aforado en cada sitio.
 - **Tabla de caudales:** fecha y Q por método y sitio, actualizada con cada aforo guardado.
@@ -17,7 +17,7 @@ App de aforos de la Asociación de Usuarios del Río La Paila (AURPA). Elaborada
 | Rol | Puede |
 |---|---|
 | Administrador | Todo: guardar aforos, subir lluvias y mapas, ubicar sitios, crear usuarios y cambiar roles, agregar/editar/eliminar resoluciones. |
-| Usuario | Consultar todas las herramientas, incluidas las resoluciones. No edita. |
+| Usuario | Guardar aforos y consultar todas las herramientas, incluidas las resoluciones. No edita lo demás. |
 | Otros | Consultar las herramientas. No ve las resoluciones CVC. |
 
 ## Dónde está cada cosa

@@ -458,6 +458,9 @@ button.kpi { font: inherit; color: inherit; text-align: left; border: 0; cursor:
 
 /* Lo que cada rol ve */
 body:not(.es-admin) .solo-admin { display: none !important; }
+body:not(.puede-guardar) .solo-guarda { display: none !important; }
+body.puede-guardar .solo-noguarda { display: none !important; }
+.s-datos-tit { margin: 4px 0 -2px; font-size: .8rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
 body.es-admin .solo-noadmin { display: none !important; }
 body.rol-otros .solo-legal { display: none !important; }
 .vs-cnt { min-width: 84px; text-align: center; font-size: .85rem; font-variant-numeric: tabular-nums; }
@@ -720,7 +723,7 @@ body{margin:0}[hidden]{display:none!important}
       <label class="f full">Nombre completo <input id="us-nombre" type="text" required></label>
       <label class="f">Usuario <span class="unit">(sin espacios ni tildes)</span> <input id="us-user" type="text" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
       <label class="f">Contraseña inicial <input id="us-pass" type="text" autocomplete="off" required></label>
-      <label class="f">Rol <select id="us-rol"><option value="usuario">Usuario (consulta todo, incluidas las resoluciones)</option><option value="otros">Otros (consulta, sin resoluciones CVC)</option><option value="admin">Administrador (edita todo)</option></select></label>
+      <label class="f">Rol <select id="us-rol"><option value="usuario">Usuario (guarda aforos y consulta todo, incluidas las resoluciones)</option><option value="otros">Otros (consulta, sin resoluciones CVC)</option><option value="admin">Administrador (edita todo)</option></select></label>
     </div>
     <button class="btn primary" type="submit" id="us-btn">Crear usuario</button>
     <p class="msg-ok" id="us-ok" role="status"></p>
@@ -979,14 +982,21 @@ body{margin:0}[hidden]{display:none!important}
         <summary>Cálculo paso a paso</summary>
         <div class="stack"><ol class="steps" id="steps"></ol></div>
       </details>
-      <p class="hint solo-noadmin">Solo el administrador guarda aforos en el Drive de AURPA. Con tu usuario puedes calcular y consultar.</p>
-      <div class="save solo-admin">
+      <p class="hint solo-noguarda">Con tu rol puedes calcular y consultar. Para guardar aforos en el Drive se necesita un usuario con rol Usuario o Administrador.</p>
+      <div class="save solo-guarda">
         <p class="hint" id="s-dest"></p>
         <div class="stack" id="s-predio-w" style="gap:10px">
-          <label class="f">Sitio de medición
+          <p class="s-datos-tit">Datos del aforo</p>
+          <label class="f">Lugar del aforo <span class="unit">(sitio de medición)</span>
             <select id="s-predio-sel" class="sitio-sel"></select></label>
           <label class="f" id="s-predio-nw" hidden>Nombre del sitio nuevo
             <input id="s-predio" type="text" autocomplete="off" placeholder="Ej.: Bocatoma La Esperanza"></label>
+          <div class="fields">
+            <label class="f">Fecha del aforo
+              <input id="s-fecha" type="date"></label>
+            <label class="f">Hora del aforo
+              <input id="s-hora" type="time"></label>
+          </div>
         </div>
         <label class="f">Responsable <span class="unit">(opcional)</span>
           <input id="s-resp" type="text" autocomplete="off"></label>
@@ -1565,6 +1575,12 @@ body{margin:0}[hidden]{display:none!important}
   }
   $("c-sitio").addEventListener("input", showDest);
   $("s-resp").addEventListener("input", () => ls.set("aforo-resp", $("s-resp").value));
+  // Fecha y hora del aforo (métodos distintos al molinete): arrancan con el momento actual y se pueden corregir.
+  function fechaHoraAhora(forzar) {
+    const n = nowParts();
+    ["s-fecha", "s-hora"].forEach((id) => { const el = $(id); if (forzar || !el.dataset.tocado) el.value = id === "s-fecha" ? n.fecha : n.hora; if (forzar) delete el.dataset.tocado; });
+  }
+  ["s-fecha", "s-hora"].forEach((id) => $(id).addEventListener("input", () => ($(id).dataset.tocado = "1")));
 
   // ---------- Lista de sitios de medición ----------
   // Se arma con las carpetas de sitio del Drive de AURPA; sin señal usa la última lista descargada.
@@ -1660,7 +1676,8 @@ body{margin:0}[hidden]{display:none!important}
       p.tabla = { encabezados: ["No.", "Distancia L (cm)", "Prof. total d (cm)", "% altura (desde fondo)", "Altura lectura (cm)", "Vel (m/s)", "Ancho faja b (m)", "Área faja (m²)", "Caudal faja q (m³/s)"],
         filas: c.rows.map((x, k) => [k + 1, R(x.Lk, 2), R(x.d, 2), R(x.p, 2), R(x.h, 2), R(x.v, 4), R(x.bb, 3), R(x.A, 4), R(x.q, 5)]) };
     } else {
-      p.info.push(["Fecha", now.fecha], ["Hora", now.hora]);
+      p.fecha = $("s-fecha").value || now.fecha; p.hora = $("s-hora").value || now.hora;
+      p.info.push(["Lugar del aforo", p.predio], ["Fecha", p.fecha], ["Hora", p.hora]);
       const panel = document.querySelector(`[data-panel="${current}"]`);
       panel.querySelectorAll("label.f").forEach((l) => {
         if (l.hidden || l.closest("[hidden]")) return;
@@ -1690,7 +1707,7 @@ body{margin:0}[hidden]{display:none!important}
     return n ? ` <span class="pend">${n} aforo(s) pendiente(s) de enviar.</span>` : "";
   }
   async function flush() {
-    if (!DRIVE_URL || !navigator.onLine || !token() || (sesionActual() || {}).rol !== "admin") return;
+    if (!DRIVE_URL || !navigator.onLine || !token() || !["admin", "usuario"].includes((sesionActual() || {}).rol)) return;
     let q = ls.get(QKEY, []); if (!q.length) return;
     const left = [];
     for (const p of q) { try { await send(p); } catch (e) { if (!e.fatal) left.push(p); } }
@@ -1715,6 +1732,7 @@ body{margin:0}[hidden]{display:none!important}
     btn.disabled = true; btn.textContent = "Guardando…"; msg.textContent = "";
     try {
       const j = await send(p);
+      fechaHoraAhora(true);   // el próximo aforo arranca con la fecha y hora actuales
       msg.innerHTML = `Guardado en la carpeta <a href="${esc(j.carpeta)}" target="_blank" rel="noopener">${esc(j.nombre || p.predio)}</a>.` + pendingMsg();
       mergeSitios([p.predio]); syncPickers();
     } catch (e) {
@@ -1801,6 +1819,7 @@ body{margin:0}[hidden]{display:none!important}
     const r = (sesionActual() || {}).rol || (PREVIEW ? "admin" : "");
     document.body.classList.toggle("es-admin", r === "admin");
     document.body.classList.toggle("rol-otros", r === "otros");
+    document.body.classList.toggle("puede-guardar", r === "admin" || r === "usuario");
   }
   let scr = "";
 
@@ -1830,7 +1849,7 @@ body{margin:0}[hidden]{display:none!important}
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-go-scr]"); if (b) go(b.dataset.goScr); });
   $("ab-back").addEventListener("click", () => go("inicio"));
   $("ab-user").addEventListener("click", () => go("cuenta"));
-  onShow.calc = () => select(current);
+  onShow.calc = () => { fechaHoraAhora(false); select(current); };
 
   // ---------- Librerías (se cargan solo cuando se abre la pantalla que las usa) ----------
   const libs = {};
