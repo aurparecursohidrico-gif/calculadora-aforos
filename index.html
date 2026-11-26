@@ -454,6 +454,8 @@ button.kpi { font: inherit; color: inherit; text-align: left; border: 0; cursor:
 .cd-pt { cursor: pointer; }
 .cd-ley { display: flex; flex-wrap: wrap; gap: 14px; font-size: .78rem; color: var(--ink-2); }
 .cd-ley span { display: flex; align-items: center; gap: 5px; }
+.btn.cd-borrar { color: var(--point); border-color: color-mix(in srgb, var(--point) 45%, var(--line)); }
+#cd-gps { width: 100%; }
 .cd-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .cd-cards div { background: var(--brand-soft); border-radius: 12px; padding: 10px 12px; }
 .cd-cards small { display: block; font-size: .76rem; color: var(--ink-2); font-weight: 700; }
@@ -652,7 +654,35 @@ body{margin:0}[hidden]{display:none!important}
     <div class="cd-tit">Sección transversal del punto · escala vertical exagerada ×2</div>
     <svg id="cd-svg-sec" viewBox="0 0 680 230" role="img" aria-label="Sección transversal del punto seleccionado"></svg>
     <div class="cd-cards" id="cd-cards"></div>
+    <p class="note" id="cd-nota"></p>
+    <div class="racc" id="cd-acc" hidden>
+      <button class="btn" type="button" id="cd-editar">Editar este punto</button>
+      <button class="btn ghost" type="button" id="cd-nuevo">+ Agregar punto</button>
+      <button class="btn cd-borrar" type="button" id="cd-borrar">Eliminar punto</button>
+    </div>
   </div>
+  <form class="card" id="f-cd" hidden novalidate>
+    <h2 id="cd-ftit">Editar punto</h2>
+    <div class="fields">
+      <label class="f full">Nombre del punto <input id="cd-f-nombre" type="text" maxlength="80" placeholder="Ej.: Antes del puente"></label>
+      <label class="f">Material <select id="cd-f-material"><option>Tierra</option><option>Revestido</option></select></label>
+      <label class="f">Abscisa <span class="unit">(m desde la bocatoma)</span><input id="cd-f-abscisa" type="text" inputmode="decimal"></label>
+      <div class="f full"><button class="btn" type="button" id="cd-gps">📍 Calcular la abscisa con mi ubicación (GPS)</button><p class="note" id="cd-gps-msg"></p></div>
+      <label class="f">Pared izquierda <span class="unit">(cm)</span><input id="cd-f-izq" type="text" inputmode="decimal"></label>
+      <label class="f">Pared derecha <span class="unit">(cm)</span><input id="cd-f-der" type="text" inputmode="decimal"></label>
+      <label class="f">Ancho <span class="unit">(cm, en el borde)</span><input id="cd-f-ancho" type="text" inputmode="decimal"></label>
+      <span></span>
+      <label class="f">Talud izquierdo <span class="unit">(cm, opcional)</span><input id="cd-f-ti" type="text" inputmode="decimal"></label>
+      <label class="f">Talud derecho <span class="unit">(cm, opcional)</span><input id="cd-f-td" type="text" inputmode="decimal"></label>
+    </div>
+    <p class="note">Paredes: profundidad desde el borde hasta el fondo, mirando aguas abajo. Talud: lo que se cierra cada pared hacia el fondo (solo si la sección es trapezoidal).</p>
+    <div class="racc">
+      <button class="btn primary" type="submit" id="cd-fbtn">Guardar punto</button>
+      <button class="btn" type="button" id="cd-cancel">Cancelar</button>
+    </div>
+    <p class="msg-err" id="cd-fmsg" role="alert"></p>
+    <p class="msg-ok" id="cd-fok" role="status"></p>
+  </form>
   <p class="foot autor">Elaborado por Ing. Mariana Charry · AURPA</p>
 </section>
 
@@ -2422,7 +2452,8 @@ body{margin:0}[hidden]{display:none!important}
   // Trazado (CTM12, relativo a 4654900 / 2034900) y 31 puntos medidos:
   // [n, nombre, material, abscisa m, x, y, pared izq cm, pared der cm, ancho cm, talud izq cm, talud der cm]
   const CD_L = [[5920,279],[5868,298],[5836,317],[5799,327],[5762,334],[5720,342],[5689,335],[5666,360],[5634,382],[5602,378],[5566,396],[5534,401],[5498,398],[5463,415],[5446,440],[5437,467],[5437,491],[5449,525],[5456,549],[5471,575],[5495,604],[5517,645],[5532,674],[5548,689],[5558,714],[5555,733],[5538,749],[5513,748],[5487,735],[5462,712],[5439,687],[5407,662],[5380,646],[5347,634],[5311,634],[5282,646],[5252,668],[5219,694],[5195,716],[5179,736],[5148,750],[5120,761],[5079,771],[4969,845],[4918,847],[4823,914],[4748,911],[4667,900],[4624,897],[4508,899],[4390,866],[4308,840],[4301,833],[3812,1007],[3764,1031],[3746,1027],[3657,911],[3546,769],[3473,688],[3405,627],[3330,550],[3246,447],[3089,475],[3023,624],[2961,634],[2877,545],[2811,612],[2761,673],[2746,693],[2615,596],[2401,429],[2377,399],[2340,363],[2015,213],[2004,211],[1782,385],[1639,502],[1610,525],[1472,637],[1304,773],[1293,760],[1130,565],[779,191],[324,547],[168,419],[111,392]];
-  const CD_P = [[1,"Bocatoma (punto de aforo)","Revestido",42,5881,295,130,130,244],[2,"Después canal nacional","Tierra",1193.6,5281,646,112,112,430],[3,"El Cairo","Tierra",1845.6,4715,908,84,86,400],[4,"El Cairo 2","Tierra",1882.5,4679,902,122,115,145],[5,"Entubamiento","Tierra",1915.1,4646,899,118,111,211],[6,"Ganado","Tierra",2086.1,4476,890,147,150,405],[7,"Puente del amor","Tierra",2437.3,4145,888,75,84,500],[8,"Esquina oficina","Tierra",2517.5,4070,915,92,83,520],[9,"Ferrocarril","Tierra",2816.8,3789,1018,152,140,460],[10,"Antes de paso nivel","Tierra",2925.9,3708,978,125,127,422],[11,"Antes de Asepaila","Tierra",3310.2,3465,681,116,92,370],[12,"Asepaila y Colombina","Tierra",3424.3,3382,603,120,138,308.4],[13,"Último en curva","Tierra",3793.7,3088,478,107,106,560],[14,"Punto medio","Tierra",3912.9,3040,587,106,108,411],[15,"Antes militares","Tierra",4012.2,2966,634,64,60,332.7],[16,"Militares","Tierra",4022.2,2957,630,107,106,187],[17,"Antes de antes de fábrica","Tierra",4256.1,2796,629,73,70,254],[18,"Antes de fábrica","Tierra",4292.1,2773,656,74,76,400],[19,"Punto 1 (23 nov)","Tierra",4743.8,2424,446,92,90,400],[20,"Punto 2 (23 nov)","Tierra",5015.1,2206,301,76,70,450],[21,"Punto 3 (23 nov)","Tierra",5219.3,2021,215,119,122,300],[22,"Punto 4 (23 nov)","Tierra",5532.6,1771,394,90,86,299],[23,"Punto 5 (23 nov)","Tierra",5990.2,1416,682,92,94,411],[24,"Punto 6 (23 nov)","Tierra",6095.3,1333,747,99,98.5,460],[25,"Punto esquina","Tierra",6143.1,1298,767,93,91,420],[26,"Donde está la Parshall","Tierra",6343.3,1170,613,94,97,442],[27,"Donde está la Lister 2.0","Tierra",6766.3,883,302,89,89,480],[28,"Donde ponen la Lister","Tierra",7218.6,542,376,102,103,350],[29,"Antes del revestimiento","Tierra",7687.8,175,425,115,86,370],[30,"Antes paso elevado Guabito","Revestido",7709.8,157,413,140,140,400,100,93.2],[31,"Paso elevado Guabito","Revestido",7745.8,124,398,130,130,106]];
+  const CD_BASE = [[1,"Bocatoma (punto de aforo)","Revestido",42,5881,295,130,130,244],[2,"Después canal nacional","Tierra",1193.6,5281,646,112,112,430],[3,"El Cairo","Tierra",1845.6,4715,908,84,86,400],[4,"El Cairo 2","Tierra",1882.5,4679,902,122,115,145],[5,"Entubamiento","Tierra",1915.1,4646,899,118,111,211],[6,"Ganado","Tierra",2086.1,4476,890,147,150,405],[7,"Puente del amor","Tierra",2437.3,4145,888,75,84,500],[8,"Esquina oficina","Tierra",2517.5,4070,915,92,83,520],[9,"Ferrocarril","Tierra",2816.8,3789,1018,152,140,460],[10,"Antes de paso nivel","Tierra",2925.9,3708,978,125,127,422],[11,"Antes de Asepaila","Tierra",3310.2,3465,681,116,92,370],[12,"Asepaila y Colombina","Tierra",3424.3,3382,603,120,138,308.4],[13,"Último en curva","Tierra",3793.7,3088,478,107,106,560],[14,"Punto medio","Tierra",3912.9,3040,587,106,108,411],[15,"Antes militares","Tierra",4012.2,2966,634,64,60,332.7],[16,"Militares","Tierra",4022.2,2957,630,107,106,187],[17,"Antes de antes de fábrica","Tierra",4256.1,2796,629,73,70,254],[18,"Antes de fábrica","Tierra",4292.1,2773,656,74,76,400],[19,"Punto 1 (23 nov)","Tierra",4743.8,2424,446,92,90,400],[20,"Punto 2 (23 nov)","Tierra",5015.1,2206,301,76,70,450],[21,"Punto 3 (23 nov)","Tierra",5219.3,2021,215,119,122,300],[22,"Punto 4 (23 nov)","Tierra",5532.6,1771,394,90,86,299],[23,"Punto 5 (23 nov)","Tierra",5990.2,1416,682,92,94,411],[24,"Punto 6 (23 nov)","Tierra",6095.3,1333,747,99,98.5,460],[25,"Punto esquina","Tierra",6143.1,1298,767,93,91,420],[26,"Donde está la Parshall","Tierra",6343.3,1170,613,94,97,442],[27,"Donde está la Lister 2.0","Tierra",6766.3,883,302,89,89,480],[28,"Donde ponen la Lister","Tierra",7218.6,542,376,102,103,350],[29,"Antes del revestimiento","Tierra",7687.8,175,425,115,86,370],[30,"Antes paso elevado Guabito","Revestido",7709.8,157,413,140,140,400,100,93.2],[31,"Paso elevado Guabito","Revestido",7745.8,124,398,130,130,106]];
+  let CD_P = CD_BASE.slice();
   const CD_NS = "http://www.w3.org/2000/svg";
   function cdEl(tag, a, padre) { const e = document.createElementNS(CD_NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (padre) padre.appendChild(e); return e; }
   function cdTx(padre, x, y, s, c, anc) { const e = cdEl("text", { x, y, class: c || "cd-lbl", "text-anchor": anc || "start" }, padre); e.textContent = s; return e; }
@@ -2433,7 +2464,7 @@ body{margin:0}[hidden]{display:none!important}
     const s0 = $("cd-svg-plan"); s0.innerHTML = "";
     cdEl("polyline", { points: CD_L.map((p) => cdSx(p[0]) + "," + cdSy(p[1])).join(" "), fill: "none", stroke: "#378ADD", "stroke-width": 2, "stroke-linejoin": "round" }, s0);
     CD_P.forEach((p) => {
-      const sel = p[0] === cdSel, nov = p[0] >= 19 && p[0] <= 24;
+      const sel = p[0] === cdSel, nov = /23 nov/i.test(p[1]);
       const c = cdEl("circle", { cx: cdSx(p[4]), cy: cdSy(p[5]), r: sel ? 7 : 4, fill: sel ? "#D85A30" : (nov ? "#1D9E75" : "#993556"), stroke: cssVar("--surface") || "#fff", "stroke-width": 1.5, class: "cd-pt" }, s0);
       c.addEventListener("click", () => cdSet(p[0]));
       cdEl("title", {}, c).textContent = p[0] + " · " + p[1];
@@ -2465,13 +2496,139 @@ body{margin:0}[hidden]{display:none!important}
     cdSel = Math.max(1, Math.min(CD_P.length, i)); $("cd-sl").value = cdSel;
     const s = CD_P[cdSel - 1];
     $("cd-info").innerHTML = `<b>Punto ${s[0]}</b> · ${esc(s[1])} <span>· ${esc(s[2])}</span>`;
-    cdPlan(); cdSec();
+    cdPlan(); cdSec(); cdNota();
   }
   $("cd-sl").max = CD_P.length;
   $("cd-sl").addEventListener("input", (e) => cdSet(+e.target.value));
   $("cd-prev").addEventListener("click", () => cdSet(cdSel - 1));
   $("cd-next").addEventListener("click", () => cdSet(cdSel + 1));
-  onShow.canal = () => cdSet(cdSel);
+  // ---------- Editar dimensiones del canal (administradores y usuarios autorizados) ----------
+  // Los puntos viven en la hoja «Dimensiones canal Derivación 2 (app)» del Drive. Mientras esa hoja no exista,
+  // se usan los 31 puntos medidos que vienen en la app; el primer guardado los pasa todos a la hoja.
+  let cdPuede = false, cdEditando = null, cdGps = null;
+  // Abscisa ↔ posición sobre el trazado (las abscisas se miden desde el primer vértice, en la bocatoma)
+  const cdAcum = (() => { const a = [0]; for (let i = 1; i < CD_L.length; i++) a.push(a[i - 1] + Math.hypot(CD_L[i][0] - CD_L[i - 1][0], CD_L[i][1] - CD_L[i - 1][1])); return a; })();
+  function cdPosAbscisa(ab) {
+    for (let i = 1; i < CD_L.length; i++) if (ab <= cdAcum[i] || i === CD_L.length - 1) {
+      const f = Math.max(0, Math.min(1, (ab - cdAcum[i - 1]) / ((cdAcum[i] - cdAcum[i - 1]) || 1)));
+      return [Math.round(CD_L[i - 1][0] + f * (CD_L[i][0] - CD_L[i - 1][0])), Math.round(CD_L[i - 1][1] + f * (CD_L[i][1] - CD_L[i - 1][1]))];
+    }
+    return CD_L[0];
+  }
+  function cdAbscisaDe(x, y) {   // punto más cercano del trazado → { abscisa, distancia al canal }
+    let mejor = { d: Infinity, ab: 0 };
+    for (let i = 1; i < CD_L.length; i++) {
+      const [x1, y1] = CD_L[i - 1], [x2, y2] = CD_L[i], dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / l2)), px = x1 + t * dx, py = y1 + t * dy, d = Math.hypot(x - px, y - py);
+      if (d < mejor.d) mejor = { d, ab: cdAcum[i - 1] + t * Math.sqrt(l2) };
+    }
+    return mejor;
+  }
+  // GPS (WGS84) → CTM12 (origen único nacional, EPSG:9377), relativo al mismo origen del trazado
+  function cdCtm12(lat, lon) {
+    const a = 6378137, f = 1 / 298.257222101, e2 = f * (2 - f), ep2 = e2 / (1 - e2), k0 = 0.9992, r = Math.PI / 180;
+    const fi = lat * r, la = lon * r, fi0 = 4 * r, la0 = -73 * r;
+    const M = (p) => a * ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 ** 3 / 256) * p - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 ** 3 / 1024) * Math.sin(2 * p)
+      + (15 * e2 * e2 / 256 + 45 * e2 ** 3 / 1024) * Math.sin(4 * p) - (35 * e2 ** 3 / 3072) * Math.sin(6 * p));
+    const N = a / Math.sqrt(1 - e2 * Math.sin(fi) ** 2), T = Math.tan(fi) ** 2, C = ep2 * Math.cos(fi) ** 2, A = (la - la0) * Math.cos(fi);
+    const x = 5000000 + k0 * N * (A + (1 - T + C) * A ** 3 / 6 + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * A ** 5 / 120);
+    const y = 2000000 + k0 * (M(fi) - M(fi0) + N * Math.tan(fi) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A ** 4 / 24 + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * A ** 6 / 720));
+    return [Math.round(x - 4654900), Math.round(y - 2034900)];
+  }
+  window.__cdCtm12 = cdCtm12;   // (para comprobar la conversión)
+  const cdObj = (p) => ({ nombre: p[1], material: p[2], abscisa: p[3], x: p[4], y: p[5], izq: p[6], der: p[7], ancho: p[8], ti: p[9] || 0, td: p[10] || 0, por: p[11] || "", ed: p[12] || "", editado: !!p[13] });
+  function cdDesdeServidor(puntos) {
+    CD_P = puntos.slice().sort((a, b) => a.abscisa - b.abscisa).map((p, i) => {
+      let x = p.x, y = p.y;
+      if (x === "" || y === "" || x == null || y == null) [x, y] = cdPosAbscisa(+p.abscisa);
+      return [i + 1, p.nombre, p.material || "Tierra", +p.abscisa, +x, +y, +p.izq, +p.der, +p.ancho, +p.ti || 0, +p.td || 0, p.por || "", p.ed || ""];
+    });
+    $("cd-sl").max = CD_P.length;
+  }
+  async function cdCargar() {
+    if (PREVIEW || !token()) return;
+    try {
+      const j = await api("canal");
+      if (!j || !j.ok) return;
+      cdPuede = !!j.puedeEditar;
+      if (j.puntos && j.puntos.length) cdDesdeServidor(j.puntos);
+    } catch (e) {}
+    $("cd-acc").hidden = !cdPuede;
+  }
+  function cdNota() {
+    const s = CD_P[cdSel - 1];
+    $("cd-nota").textContent = s && s[11] ? `Última edición: ${s[11]}${s[12] ? " · " + fdl(String(s[12]).slice(0, 10)) : ""}` : "";
+  }
+  function cdAbrirForm(nuevo) {
+    const s = CD_P[cdSel - 1], f = $("f-cd");
+    cdEditando = nuevo ? null : cdSel; cdGps = null;
+    f.reset(); f.hidden = false; $("cd-fmsg").textContent = ""; $("cd-fok").textContent = ""; $("cd-gps-msg").textContent = "";
+    $("cd-ftit").textContent = nuevo ? "Agregar punto medido" : `Editar punto ${s[0]} · ${s[1]}`;
+    if (!nuevo) {
+      $("cd-f-nombre").value = s[1]; $("cd-f-material").value = s[2]; $("cd-f-abscisa").value = String(s[3]).replace(".", ",");
+      $("cd-f-izq").value = String(s[6]).replace(".", ","); $("cd-f-der").value = String(s[7]).replace(".", ",");
+      $("cd-f-ancho").value = String(s[8]).replace(".", ",");
+      $("cd-f-ti").value = s[9] ? String(s[9]).replace(".", ",") : ""; $("cd-f-td").value = s[10] ? String(s[10]).replace(".", ",") : "";
+    }
+    f.scrollIntoView({ block: "start" }); $("cd-f-nombre").focus();
+  }
+  async function cdGuardarLista(lista, aviso) {
+    const j = await api("guardarCanal", { puntos: lista.map(cdObj) });
+    if (!j || !j.ok) throw new Error((j && j.error) || "No se pudo guardar.");
+    await cdCargar();
+    return aviso;
+  }
+  $("cd-editar").addEventListener("click", () => cdAbrirForm(false));
+  $("cd-nuevo").addEventListener("click", () => cdAbrirForm(true));
+  $("cd-cancel").addEventListener("click", () => { $("f-cd").hidden = true; });
+  $("cd-borrar").addEventListener("click", async () => {
+    const s = CD_P[cdSel - 1];
+    if (!confirm(`¿Eliminar el punto ${s[0]} «${s[1]}» (abscisa ${cdF(s[3])} m)?`)) return;
+    $("cd-nota").textContent = "Guardando…";
+    try {
+      await cdGuardarLista(CD_P.filter((p) => p !== s));
+      cdSet(Math.min(cdSel, CD_P.length)); $("cd-nota").textContent = `Se eliminó «${s[1]}».`;
+    } catch (e) { $("cd-nota").textContent = e.message || "Sin conexión."; }
+  });
+  $("cd-gps").addEventListener("click", () => {
+    const m = $("cd-gps-msg");
+    if (!navigator.geolocation) { m.textContent = "Este dispositivo no tiene GPS disponible."; return; }
+    m.textContent = "Buscando tu ubicación…";
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const [x, y] = cdCtm12(pos.coords.latitude, pos.coords.longitude), r = cdAbscisaDe(x, y);
+      if (r.d > 150) { m.textContent = `Estás a ${cdF(r.d)} m del canal: acércate al punto para calcular la abscisa.`; return; }
+      cdGps = [x, y];
+      $("cd-f-abscisa").value = String(Math.round(r.ab * 10) / 10).replace(".", ",");
+      m.textContent = `Abscisa calculada con el GPS: ${cdF(r.ab)} m (a ${cdF(r.d)} m del eje del canal, precisión ±${cdF(pos.coords.accuracy)} m).`;
+    }, (err) => { m.textContent = "No se pudo leer el GPS: " + (err.message || "permiso denegado"); }, { enableHighAccuracy: true, timeout: 20000 });
+  });
+  $("cd-f-abscisa").addEventListener("input", () => { cdGps = null; });
+  $("f-cd").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const val = (id) => $(id).value.trim(), n = (id) => num(val(id)), msg = $("cd-fmsg");
+    msg.textContent = "";
+    const p = { nombre: val("cd-f-nombre"), material: $("cd-f-material").value, abscisa: n("cd-f-abscisa"), izq: n("cd-f-izq"), der: n("cd-f-der"),
+      ancho: n("cd-f-ancho"), ti: val("cd-f-ti") ? n("cd-f-ti") : 0, td: val("cd-f-td") ? n("cd-f-td") : 0 };
+    if (!p.nombre) { msg.textContent = "Escribe el nombre del punto."; return; }
+    if (!(p.abscisa >= 0)) { msg.textContent = "Escribe la abscisa en metros (o calcúlala con el GPS)."; return; }
+    if (!(p.izq > 0) || !(p.der > 0) || !(p.ancho > 0)) { msg.textContent = "Escribe la pared izquierda, la pared derecha y el ancho en cm."; return; }
+    if (!isFinite(p.ti) || !isFinite(p.td) || p.ti + p.td >= p.ancho) { msg.textContent = "Revisa los taludes: deben ser menores que el ancho."; return; }
+    const viejo = cdEditando ? CD_P[cdEditando - 1] : null;
+    const [x, y] = cdGps || (viejo && viejo[3] === p.abscisa ? [viejo[4], viejo[5]] : cdPosAbscisa(p.abscisa));
+    const fila = [0, p.nombre, p.material, p.abscisa, x, y, p.izq, p.der, p.ancho, p.ti, p.td, "", "", true];
+    const lista = viejo ? CD_P.map((q) => (q === viejo ? fila : q)) : CD_P.concat([fila]);
+    $("cd-fbtn").disabled = true; $("cd-fok").textContent = "Guardando en el Drive…";
+    try {
+      await cdGuardarLista(lista);
+      $("f-cd").hidden = true;
+      const i = CD_P.findIndex((q) => q[1] === p.nombre && q[3] === p.abscisa);
+      cdSet(i >= 0 ? i + 1 : cdSel);
+      $("cd-nota").textContent = `Punto «${p.nombre}» guardado.`;
+      $("scr-canal").scrollIntoView({ block: "start" });
+    } catch (err) { msg.textContent = err.message || "Sin conexión."; $("cd-fok").textContent = ""; }
+    finally { $("cd-fbtn").disabled = false; }
+  });
+  onShow.canal = async () => { cdSet(cdSel); await cdCargar(); cdSet(Math.min(cdSel, CD_P.length)); };
 
   // ---------- Resoluciones CVC ----------
   // Las resoluciones (datos y páginas escaneadas) están en el Drive de AURPA, carpeta «Resoluciones (app)».
@@ -2837,7 +2994,7 @@ body{margin:0}[hidden]{display:none!important}
       const yo = (sesionActual() || {}).usuario;
       $("us-list").innerHTML = j.usuarios.map((u) => `<div class="urow" data-u="${esc(u.usuario)}">
         <div class="txt"><b>${esc(u.nombre)}<span class="badge">${ROL_TXT[u.rol] || "Usuario"}</span>${u.activo ? "" : '<span class="badge off">Desactivado</span>'}</b><span>${esc(u.usuario)}</span></div>
-        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<select class="us-rolsel" aria-label="Rol de ${esc(u.nombre)}">${["usuario", "otros", "zonaalta", "admin"].map((r) => `<option value="${r}"${(u.rol || "usuario") === r ? " selected" : ""}>${ROL_TXT[r]}</option>`).join("")}</select>${(u.rol || "usuario") === "usuario" ? `<label class="us-graf"><input type="checkbox" data-graf${u.grafica ? " checked" : ""}> Sus aforos van en «Lluvias vs caudales»</label>` : ""}<button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button><button class="btn us-borrar" type="button" data-accion="borrar">Eliminar</button>`}
+        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<select class="us-rolsel" aria-label="Rol de ${esc(u.nombre)}">${["usuario", "otros", "zonaalta", "admin"].map((r) => `<option value="${r}"${(u.rol || "usuario") === r ? " selected" : ""}>${ROL_TXT[r]}</option>`).join("")}</select>${(u.rol || "usuario") === "usuario" ? `<label class="us-graf"><input type="checkbox" data-graf${u.grafica ? " checked" : ""}> Sus aforos van en «Lluvias vs caudales»</label><label class="us-graf"><input type="checkbox" data-canal${u.canal ? " checked" : ""}> Puede editar dimensiones del canal</label>` : ""}<button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button><button class="btn us-borrar" type="button" data-accion="borrar">Eliminar</button>`}
       </div>`).join("");
     } catch (e) { $("us-list").innerHTML = ""; $("us-msg").textContent = e.message || "Sin conexión."; }
   };
@@ -2863,10 +3020,11 @@ body{margin:0}[hidden]{display:none!important}
     catch (err) { $("us-msg").textContent = err.message || "Sin conexión."; b.disabled = false; }
   });
   $("us-list").addEventListener("change", async (e) => {
-    const g = e.target.closest("[data-graf]");
+    const g = e.target.closest("[data-graf], [data-canal]");
     if (g) {
       const u = g.closest("[data-u]").dataset.u; g.disabled = true; $("us-msg").textContent = "";
-      try { const j = await api("estadoUsuario", { usuario: u, grafica: g.checked }); if (!j.ok) throw new Error(j.error); }
+      const campo = g.hasAttribute("data-canal") ? { canal: g.checked } : { grafica: g.checked };
+      try { const j = await api("estadoUsuario", Object.assign({ usuario: u }, campo)); if (!j.ok) throw new Error(j.error); }
       catch (err) { g.checked = !g.checked; $("us-msg").textContent = err.message || "Sin conexión."; }
       finally { g.disabled = false; }
       return;

@@ -58,6 +58,8 @@ function doPost(e) {
     if (accion === 'sitios') return responder({ ok: true, sitios: listarSitios() });
     if (accion === 'lluvias') return responder({ ok: true, dias: leerLluvias(), areas: leerAreas(), mapas: listarMapas() });
     if (accion === 'mapaLluvia') return responder(leerMapa(a.mes));
+    if (accion === 'canal') return responder(leerCanal(ses));
+    if (accion === 'guardarCanal') return responder(guardarCanal(ses, a));
     if (accion === 'resoluciones' || accion === 'resolucionPagina') {
       if (ses.rol === 'otros') return responder({ ok: false, error: 'Tu usuario no tiene acceso a las resoluciones CVC.' });
       if (accion === 'resoluciones') return responder(leerResoluciones());
@@ -152,9 +154,10 @@ function hojaUsuarios() {
 function filasUsuarios() {
   var sh = hojaUsuarios(), n = sh.getLastRow() - 1;
   if (n < 1) return [];
-  return sh.getRange(2, 1, n, 9).getValues().map(function (r, i) {
+  return sh.getRange(2, 1, n, 10).getValues().map(function (r, i) {
     return { fila: i + 2, usuario: String(r[0]), nombre: String(r[1]), rol: String(r[2]), activo: r[3] === true || String(r[3]).toUpperCase() === 'SI', sal: String(r[4]), huella: String(r[5]),
-      grafica: r[8] === true || String(r[8]).toUpperCase() === 'SI' };
+      grafica: r[8] === true || String(r[8]).toUpperCase() === 'SI',
+      canal: r[9] === true || String(r[9]).toUpperCase() === 'SI' };
   });
 }
 function hayUsuarios() { return filasUsuarios().length > 0; }
@@ -231,7 +234,7 @@ function crearUsuario(a) {
   return { ok: true };
 }
 function listarUsuarios() {
-  return filasUsuarios().map(function (x) { return { usuario: x.usuario, nombre: x.nombre, rol: x.rol, activo: x.activo, grafica: x.grafica }; });
+  return filasUsuarios().map(function (x) { return { usuario: x.usuario, nombre: x.nombre, rol: x.rol, activo: x.activo, grafica: x.grafica, canal: x.canal }; });
 }
 function estadoUsuario(ses, a) {
   var u = String(a.usuario || '').toLowerCase();
@@ -249,6 +252,10 @@ function estadoUsuario(ses, a) {
   if (typeof a.grafica === 'boolean') {   // ¿sus aforos van en «Lluvias vs caudales»?
     if (!sh.getRange(1, 9).getValue()) sh.getRange(1, 9).setValue('Aforos en gráfica').setFontWeight('bold');
     sh.getRange(usr.fila, 9).setValue(a.grafica ? 'SI' : 'NO');
+  }
+  if (typeof a.canal === 'boolean') {   // ¿puede editar las dimensiones del canal Derivación 2?
+    if (!sh.getRange(1, 10).getValue()) sh.getRange(1, 10).setValue('Edita canal').setFontWeight('bold');
+    sh.getRange(usr.fila, 10).setValue(a.canal ? 'SI' : 'NO');
   }
   return { ok: true };
 }
@@ -651,6 +658,65 @@ function paginaResolucion(a) {
     }
   }
   return { ok: false, error: 'No se encontró la página ' + p + '.' };
+}
+
+// ---------- dimensiones del canal Derivación 2 ----------
+// Hoja «Dimensiones canal Derivación 2 (app)» en la carpeta raíz: un punto medido por fila.
+// La editan los administradores y los usuarios con «Edita canal» = SI en la hoja de usuarios.
+var HOJA_CANAL = 'Dimensiones canal Derivación 2 (app)';
+var ENC_CANAL = ['No.', 'Nombre', 'Material', 'Abscisa (m)', 'Pared izquierda (cm)', 'Pared derecha (cm)', 'Ancho (cm)',
+  'Talud izquierdo (cm)', 'Talud derecho (cm)', 'X (CTM12)', 'Y (CTM12)', 'Editado por', 'Editado'];
+function puedeEditarCanal(ses) {
+  if (ses.rol === 'admin') return true;
+  var u = filasUsuarios().filter(function (x) { return x.usuario === ses.usuario; })[0];
+  return !!(u && u.canal && u.rol === 'usuario');
+}
+function hojaCanal(crear) {
+  var raiz = carpetaRaiz(), it = raiz.getFilesByName(HOJA_CANAL);
+  while (it.hasNext()) { var f = it.next(); if (!f.isTrashed()) return SpreadsheetApp.open(f).getSheets()[0]; }
+  if (!crear) return null;
+  var ss = SpreadsheetApp.create(HOJA_CANAL);
+  DriveApp.getFileById(ss.getId()).moveTo(raiz);
+  var sh = ss.getSheets()[0];
+  sh.setName('Puntos');
+  sh.appendRow(ENC_CANAL);
+  sh.getRange(1, 1, 1, ENC_CANAL.length).setFontWeight('bold').setBackground('#e6f3e2');
+  sh.setFrozenRows(1);
+  return sh;
+}
+function leerCanal(ses) {
+  var sh = hojaCanal(false), out = { ok: true, puedeEditar: puedeEditarCanal(ses), puntos: [] };
+  if (!sh || sh.getLastRow() < 2) { out.falta = true; return out; }
+  out.puntos = sh.getRange(2, 1, sh.getLastRow() - 1, ENC_CANAL.length).getValues().map(function (r) {
+    return { nombre: String(r[1]), material: String(r[2]), abscisa: numero(r[3]), izq: numero(r[4]), der: numero(r[5]), ancho: numero(r[6]),
+      ti: numero(r[7]), td: numero(r[8]), x: numero(r[9]), y: numero(r[10]), por: String(r[11] || ''), ed: r[12] instanceof Date ? r[12].toISOString() : '' };
+  }).filter(function (p) { return p.nombre && p.abscisa !== ''; });
+  return out;
+}
+// Recibe la lista completa de puntos y reemplaza la hoja (ordenada por abscisa).
+function guardarCanal(ses, a) {
+  if (!puedeEditarCanal(ses)) return { ok: false, error: 'Tu usuario no puede editar las dimensiones del canal.' };
+  var lista = (a.puntos || []).slice(0, 500), filas = [], ahora = new Date();
+  for (var i = 0; i < lista.length; i++) {
+    var p = lista[i], fila = {
+      nombre: limpiar(p.nombre, 80), material: p.material === 'Revestido' ? 'Revestido' : 'Tierra', abscisa: numero(p.abscisa),
+      izq: numero(p.izq), der: numero(p.der), ancho: numero(p.ancho), ti: numero(p.ti), td: numero(p.td), x: numero(p.x), y: numero(p.y)
+    };
+    if (!fila.nombre) return { ok: false, error: 'Hay un punto sin nombre.' };
+    if (!(fila.abscisa >= 0) || !(fila.izq > 0) || !(fila.der > 0) || !(fila.ancho > 0)) return { ok: false, error: 'Revisa el punto «' + fila.nombre + '»: abscisa, paredes y ancho deben ser números mayores que cero.' };
+    filas.push([0, fila.nombre, fila.material, fila.abscisa, fila.izq, fila.der, fila.ancho, fila.ti, fila.td, fila.x, fila.y,
+      p.editado ? ses.nombre : limpiar(p.por, 80), p.editado ? ahora : (p.ed && !isNaN(new Date(p.ed)) ? new Date(p.ed) : '')]);
+  }
+  if (!filas.length) return { ok: false, error: 'No hay puntos para guardar.' };
+  filas.sort(function (x, y) { return x[3] - y[3]; });
+  filas.forEach(function (f, k) { f[0] = k + 1; });
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = hojaCanal(true);
+    if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, ENC_CANAL.length).clearContent();
+    sh.getRange(2, 1, filas.length, ENC_CANAL.length).setValues(filas);
+    return { ok: true, n: filas.length };
+  } finally { lock.releaseLock(); }
 }
 
 // ---------- aforos de usuarios zona alta ----------
