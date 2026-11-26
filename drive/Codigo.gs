@@ -90,8 +90,7 @@ function doPost(e) {
     try {
       var carpetaDelMetodo = za ? buscarOCrear(carpetaZonaAlta(), nombreMetodo(a.metodo)) : carpetaMetodo(nombreMetodo(a.metodo));
       var carpeta = carpetaPredio(predio, carpetaDelMetodo);
-      var resumen = hojaResumen(carpeta, predio);
-      if (za) conUsuario(resumen);
+      var resumen = conUsuario(hojaResumen(carpeta, predio));
 
       // Si este aforo ya se había guardado (reintento sin señal), no se duplica.
       var id = limpiar(a.id, 60);
@@ -106,12 +105,11 @@ function doPost(e) {
         'Mira inicial (cm)': numero(a.mira_ini != null ? a.mira_ini : dato(a, /mira inicial/i)),
         'Mira final (cm)': numero(a.mira_fin != null ? a.mira_fin : dato(a, /mira final/i)),
         'Sitio de medición': limpiar(a.sitio, 80), 'Responsable': limpiar(a.responsable, 80),
-        'Archivo': archivo.getUrl(), 'ID': id, 'Guardado': new Date(), 'Carpeta': dia.getUrl(), 'Usuario': za ? ses.usuario : ''
+        'Archivo': archivo.getUrl(), 'ID': id, 'Guardado': new Date(), 'Carpeta': dia.getUrl(), 'Usuario': ses.usuario
       };
       agregarFila(resumen, valores);
       numerar(resumen);
-      var delMetodo = hojaResumenMetodo(carpetaDelMetodo);
-      if (za) conUsuario(delMetodo);
+      var delMetodo = conUsuario(hojaResumenMetodo(carpetaDelMetodo));
       agregarFila(delMetodo, valores);
       numerar(delMetodo);
       return responder({ ok: true, carpeta: dia.getUrl(), nombre: dia.getName(), archivo: archivo.getUrl() });
@@ -153,8 +151,9 @@ function hojaUsuarios() {
 function filasUsuarios() {
   var sh = hojaUsuarios(), n = sh.getLastRow() - 1;
   if (n < 1) return [];
-  return sh.getRange(2, 1, n, 8).getValues().map(function (r, i) {
-    return { fila: i + 2, usuario: String(r[0]), nombre: String(r[1]), rol: String(r[2]), activo: r[3] === true || String(r[3]).toUpperCase() === 'SI', sal: String(r[4]), huella: String(r[5]) };
+  return sh.getRange(2, 1, n, 9).getValues().map(function (r, i) {
+    return { fila: i + 2, usuario: String(r[0]), nombre: String(r[1]), rol: String(r[2]), activo: r[3] === true || String(r[3]).toUpperCase() === 'SI', sal: String(r[4]), huella: String(r[5]),
+      grafica: r[8] === true || String(r[8]).toUpperCase() === 'SI' };
   });
 }
 function hayUsuarios() { return filasUsuarios().length > 0; }
@@ -231,7 +230,7 @@ function crearUsuario(a) {
   return { ok: true };
 }
 function listarUsuarios() {
-  return filasUsuarios().map(function (x) { return { usuario: x.usuario, nombre: x.nombre, rol: x.rol, activo: x.activo }; });
+  return filasUsuarios().map(function (x) { return { usuario: x.usuario, nombre: x.nombre, rol: x.rol, activo: x.activo, grafica: x.grafica }; });
 }
 function estadoUsuario(ses, a) {
   var u = String(a.usuario || '').toLowerCase();
@@ -246,6 +245,10 @@ function estadoUsuario(ses, a) {
   }
   if (typeof a.activo === 'boolean') sh.getRange(usr.fila, 4).setValue(a.activo);
   if (a.rol) sh.getRange(usr.fila, 3).setValue(rolValido(a.rol));   // cambiar el rol (no el propio: se revisa arriba)
+  if (typeof a.grafica === 'boolean') {   // ¿sus aforos van en «Lluvias vs caudales»?
+    if (!sh.getRange(1, 9).getValue()) sh.getRange(1, 9).setValue('Aforos en gráfica').setFontWeight('bold');
+    sh.getRange(usr.fila, 9).setValue(a.grafica ? 'SI' : 'NO');
+  }
   return { ok: true };
 }
 function rolValido(r) { return r === 'admin' || r === 'otros' || r === 'zonaalta' ? r : 'usuario'; }
@@ -261,7 +264,13 @@ function cambiarClave(ses, a) {
 // =====================================================================
 // DATOS PARA LA APP: caudales por método (fecha y Q) y ubicación de los sitios
 // =====================================================================
-function aforosPorMetodo() { return aforosDeCarpeta(carpetaRaiz(), null); }
+function aforosPorMetodo() {
+  var cuentan = {};
+  filasUsuarios().forEach(function (x) { if (x.rol === 'admin' || x.grafica) cuentan[x.usuario] = true; });
+  var out = aforosDeCarpeta(carpetaRaiz(), null);
+  Object.keys(out).forEach(function (m) { out[m].forEach(function (x) { x.g = !x.u || !!cuentan[x.u]; }); });
+  return out;
+}
 // Aforos de los usuarios zona alta (de uno solo si se da su usuario), con el nombre de quien lo hizo.
 function aforosZonaAlta(usuario) {
   var c = carpetaZonaAlta(false);

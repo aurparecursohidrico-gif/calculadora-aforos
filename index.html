@@ -375,6 +375,8 @@ button.kpi { font: inherit; color: inherit; text-align: left; border: 0; cursor:
 .urow .txt { flex: 1; min-width: 160px; }
 .urow .txt b { display: block; }
 .urow .txt span { font-size: .8rem; color: var(--muted); }
+.us-graf { display: flex; align-items: center; gap: 8px; width: 100%; font-size: .84rem; font-weight: 600; color: var(--ink-2); }
+.us-graf input { width: 20px; height: 20px; min-height: 0; accent-color: var(--brand); }
 .us-rolsel { font: 700 .84rem var(--font-body); min-height: 36px; padding: 4px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
 .urow .btn { min-height: 36px; padding: 6px 12px; font-size: .82rem; }
 .badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .72rem; font-weight: 800; background: var(--brand-soft); color: var(--brand); margin-left: 6px; }
@@ -2200,7 +2202,7 @@ body{margin:0}[hidden]{display:none!important}
     const sitio = $("lq-sitio").value;
     const L = await lluvias();
     try { await cargarScript(CHART_JS); } catch (e) { $("lq-note").textContent = e.message; return; }
-    const af = datos.aforos[met].filter((a) => a.s === sitio);
+    const af = datos.aforos[met].filter((a) => a.s === sitio && a.g !== false);   // solo administradores y usuarios autorizados
     const qDia = {};
     af.forEach((a) => { (qDia[a.f] = qDia[a.f] || []).push(a.q); });
     const rain = {}; ((L && L.dias) || []).forEach((d) => (rain[d.f] = d.mm));
@@ -2227,7 +2229,7 @@ body{margin:0}[hidden]{display:none!important}
           mm: { position: "right", title: { display: true, text: "Lluvia (mm)", color: ink }, ticks: { color: ink }, grid: { display: false }, beginAtZero: true } } }
     });
     const fuera = af.filter((a) => !(a.f in rain)).length;
-    $("lq-note").textContent = `${af.length} aforo(s) de ${sitio} con ${met.toLowerCase()}. Lluvia: promedio de la cuenca ponderado por el área de cada pluviómetro.` +
+    $("lq-note").textContent = `${af.length} aforo(s) de ${sitio} con ${met.toLowerCase()} (solo de administradores y usuarios autorizados). Lluvia: promedio de la cuenca ponderado por el área de cada pluviómetro.` +
       (fuera ? ` ${fuera} aforo(s) caen en fechas sin datos de lluvia todavía.` : "");
   };
 
@@ -2834,7 +2836,7 @@ body{margin:0}[hidden]{display:none!important}
       const yo = (sesionActual() || {}).usuario;
       $("us-list").innerHTML = j.usuarios.map((u) => `<div class="urow" data-u="${esc(u.usuario)}">
         <div class="txt"><b>${esc(u.nombre)}<span class="badge">${ROL_TXT[u.rol] || "Usuario"}</span>${u.activo ? "" : '<span class="badge off">Desactivado</span>'}</b><span>${esc(u.usuario)}</span></div>
-        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<select class="us-rolsel" aria-label="Rol de ${esc(u.nombre)}">${["usuario", "otros", "zonaalta", "admin"].map((r) => `<option value="${r}"${(u.rol || "usuario") === r ? " selected" : ""}>${ROL_TXT[r]}</option>`).join("")}</select><button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button>`}
+        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<select class="us-rolsel" aria-label="Rol de ${esc(u.nombre)}">${["usuario", "otros", "zonaalta", "admin"].map((r) => `<option value="${r}"${(u.rol || "usuario") === r ? " selected" : ""}>${ROL_TXT[r]}</option>`).join("")}</select>${(u.rol || "usuario") === "usuario" ? `<label class="us-graf"><input type="checkbox" data-graf${u.grafica ? " checked" : ""}> Sus aforos van en «Lluvias vs caudales»</label>` : ""}<button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button>`}
       </div>`).join("");
     } catch (e) { $("us-list").innerHTML = ""; $("us-msg").textContent = e.message || "Sin conexión."; }
   };
@@ -2852,6 +2854,14 @@ body{margin:0}[hidden]{display:none!important}
     catch (err) { $("us-msg").textContent = err.message || "Sin conexión."; b.disabled = false; }
   });
   $("us-list").addEventListener("change", async (e) => {
+    const g = e.target.closest("[data-graf]");
+    if (g) {
+      const u = g.closest("[data-u]").dataset.u; g.disabled = true; $("us-msg").textContent = "";
+      try { const j = await api("estadoUsuario", { usuario: u, grafica: g.checked }); if (!j.ok) throw new Error(j.error); }
+      catch (err) { g.checked = !g.checked; $("us-msg").textContent = err.message || "Sin conexión."; }
+      finally { g.disabled = false; }
+      return;
+    }
     const s = e.target.closest(".us-rolsel"); if (!s) return;
     const u = s.closest("[data-u]").dataset.u;
     s.disabled = true; $("us-msg").textContent = "";
