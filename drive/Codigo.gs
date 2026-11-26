@@ -64,7 +64,7 @@ function doPost(e) {
       return responder(paginaResolucion(a));
     }
     if (accion === 'guardar' && ses.rol === 'otros') return responder({ ok: false, error: 'Tu usuario no puede guardar aforos en el Drive.' });
-    var SOLO_ADMIN = ['ubicar', 'usuarios', 'crearUsuario', 'estadoUsuario', 'subirLluvias', 'subirMapa',
+    var SOLO_ADMIN = ['ubicar', 'usuarios', 'crearUsuario', 'estadoUsuario', 'eliminarUsuario', 'subirLluvias', 'subirMapa',
       'guardarResolucion', 'subirPaginaResolucion', 'recortarResolucion', 'eliminarResolucion'];
     if (SOLO_ADMIN.indexOf(accion) >= 0) {
       if (ses.rol !== 'admin') return responder({ ok: false, error: 'Solo un administrador puede hacer esto.' });
@@ -78,6 +78,7 @@ function doPost(e) {
       if (accion === 'usuarios') return responder({ ok: true, usuarios: listarUsuarios() });
       if (accion === 'crearUsuario') return responder(crearUsuario(a));
       if (accion === 'estadoUsuario') return responder(estadoUsuario(ses, a));
+      if (accion === 'eliminarUsuario') return responder(eliminarUsuario(ses, a));
     }
     if (accion !== 'guardar') return responder({ ok: false, error: 'Acción desconocida.' });
     if (!a.responsable || za) a.responsable = ses.nombre;   // en zona alta el responsable es siempre quien guarda
@@ -250,6 +251,21 @@ function estadoUsuario(ses, a) {
     sh.getRange(usr.fila, 9).setValue(a.grafica ? 'SI' : 'NO');
   }
   return { ok: true };
+}
+// Borra la cuenta (la fila de la hoja de usuarios). Sus sesiones dejan de valer de inmediato.
+// Los aforos que guardó se conservan en el Drive con su nombre.
+function eliminarUsuario(ses, a) {
+  var u = String(a.usuario || '').toLowerCase();
+  if (u === ses.usuario) return { ok: false, error: 'No puedes eliminar tu propio usuario.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var usr = filasUsuarios().filter(function (x) { return x.usuario === u; })[0];
+    if (!usr) return { ok: false, error: 'No existe ese usuario.' };
+    if (usr.rol === 'admin' && filasUsuarios().filter(function (x) { return x.rol === 'admin' && x.activo; }).length <= 1)
+      return { ok: false, error: 'No se puede eliminar el único administrador activo.' };
+    hojaUsuarios().deleteRow(usr.fila);
+    return { ok: true };
+  } finally { lock.releaseLock(); }
 }
 function rolValido(r) { return r === 'admin' || r === 'otros' || r === 'zonaalta' ? r : 'usuario'; }
 function cambiarClave(ses, a) {

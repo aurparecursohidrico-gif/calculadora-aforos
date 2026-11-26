@@ -377,6 +377,7 @@ button.kpi { font: inherit; color: inherit; text-align: left; border: 0; cursor:
 .urow .txt span { font-size: .8rem; color: var(--muted); }
 .us-graf { display: flex; align-items: center; gap: 8px; width: 100%; font-size: .84rem; font-weight: 600; color: var(--ink-2); }
 .us-graf input { width: 20px; height: 20px; min-height: 0; accent-color: var(--brand); }
+.urow .btn.us-borrar { color: var(--point); border-color: color-mix(in srgb, var(--point) 45%, var(--line)); }
 .us-rolsel { font: 700 .84rem var(--font-body); min-height: 36px; padding: 4px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
 .urow .btn { min-height: 36px; padding: 6px 12px; font-size: .82rem; }
 .badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .72rem; font-weight: 800; background: var(--brand-soft); color: var(--brand); margin-left: 6px; }
@@ -2836,7 +2837,7 @@ body{margin:0}[hidden]{display:none!important}
       const yo = (sesionActual() || {}).usuario;
       $("us-list").innerHTML = j.usuarios.map((u) => `<div class="urow" data-u="${esc(u.usuario)}">
         <div class="txt"><b>${esc(u.nombre)}<span class="badge">${ROL_TXT[u.rol] || "Usuario"}</span>${u.activo ? "" : '<span class="badge off">Desactivado</span>'}</b><span>${esc(u.usuario)}</span></div>
-        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<select class="us-rolsel" aria-label="Rol de ${esc(u.nombre)}">${["usuario", "otros", "zonaalta", "admin"].map((r) => `<option value="${r}"${(u.rol || "usuario") === r ? " selected" : ""}>${ROL_TXT[r]}</option>`).join("")}</select>${(u.rol || "usuario") === "usuario" ? `<label class="us-graf"><input type="checkbox" data-graf${u.grafica ? " checked" : ""}> Sus aforos van en «Lluvias vs caudales»</label>` : ""}<button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button>`}
+        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<select class="us-rolsel" aria-label="Rol de ${esc(u.nombre)}">${["usuario", "otros", "zonaalta", "admin"].map((r) => `<option value="${r}"${(u.rol || "usuario") === r ? " selected" : ""}>${ROL_TXT[r]}</option>`).join("")}</select>${(u.rol || "usuario") === "usuario" ? `<label class="us-graf"><input type="checkbox" data-graf${u.grafica ? " checked" : ""}> Sus aforos van en «Lluvias vs caudales»</label>` : ""}<button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button><button class="btn us-borrar" type="button" data-accion="borrar">Eliminar</button>`}
       </div>`).join("");
     } catch (e) { $("us-list").innerHTML = ""; $("us-msg").textContent = e.message || "Sin conexión."; }
   };
@@ -2847,6 +2848,14 @@ body{margin:0}[hidden]{display:none!important}
       if (row.querySelector(".reset")) return;
       row.insertAdjacentHTML("beforeend", `<div class="reset" style="display:flex;gap:8px;width:100%"><input type="text" placeholder="Nueva contraseña (mín. 6)" autocomplete="off"><button class="btn primary" type="button" data-accion="guardar-clave">Guardar</button></div>`);
       row.querySelector(".reset input").focus(); return;
+    }
+    if (b.dataset.accion === "borrar") {
+      const nom = row.querySelector(".txt b").firstChild.textContent.trim();
+      if (!confirm(`¿Eliminar definitivamente el usuario «${u}» (${nom})?\n\nYa no podrá entrar a la app. Los aforos que guardó se conservan en el Drive con su nombre. Esto no se puede deshacer: si vuelve, habría que crearle una cuenta nueva.`)) return;
+      b.disabled = true; $("us-msg").textContent = "";
+      try { const j = await api("eliminarUsuario", { usuario: u }); if (!j.ok) throw new Error(j.error); onShow.usuarios(); }
+      catch (err) { $("us-msg").textContent = err.message || "Sin conexión."; b.disabled = false; }
+      return;
     }
     const extra = b.dataset.accion === "guardar-clave" ? { clave: row.querySelector(".reset input").value } : { activo: b.dataset.accion === "on" };
     b.disabled = true;
