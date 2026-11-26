@@ -460,6 +460,7 @@ button.kpi { font: inherit; color: inherit; text-align: left; border: 0; cursor:
 body:not(.es-admin) .solo-admin { display: none !important; }
 body:not(.puede-guardar) .solo-guarda { display: none !important; }
 body.puede-guardar .solo-noguarda { display: none !important; }
+body.rol-zonaalta .no-zonaalta { display: none !important; }
 .s-datos-tit { margin: 4px 0 -2px; font-size: .8rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
 body.es-admin .solo-noadmin { display: none !important; }
 body.rol-otros .solo-legal { display: none !important; }
@@ -507,8 +508,8 @@ body{margin:0}[hidden]{display:none!important}
 <section class="scr page" id="scr-inicio" hidden>
   <p class="preview" id="preview-note" hidden>Vista previa en Claude: el inicio de sesión y los datos funcionan en aurparecursohidrico-gif.github.io/calculadora-aforos</p>
   <p class="hello" id="hello">Hola</p>
-  <h2 class="sec-tit">Estado del aforo hoy</h2>
-  <div class="kpis" id="kpis"></div>
+  <h2 class="sec-tit no-zonaalta">Estado del aforo hoy</h2>
+  <div class="kpis no-zonaalta" id="kpis"></div>
   <h2 class="sec-tit">Herramientas de análisis</h2>
   <div class="tiles">
     <button class="tile main" type="button" data-go-scr="calc">
@@ -516,11 +517,11 @@ body{margin:0}[hidden]{display:none!important}
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h2M16 15v3"/></svg></span>
       <div><b>Calculadora de aforos</b><br><span>Molinete, volumétrico, flotador, vertedero y Parshall</span></div>
     </button>
-    <button class="tile" type="button" data-go-scr="lluvia">
+    <button class="tile no-zonaalta" type="button" data-go-scr="lluvia">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 15a4 4 0 0 1 .5-8 5 5 0 0 1 9.6 1.5A3.5 3.5 0 0 1 17 15H7z"/><path d="M8 18l-1 2M12 18l-1 2M16 18l-1 2"/></svg></span>
       <b>Lluvias</b><span>Lluvia diaria y mensual de la cuenca</span>
     </button>
-    <button class="tile" type="button" data-go-scr="lq">
+    <button class="tile no-zonaalta" type="button" data-go-scr="lq">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20h16M6 17V12M10 17V9M14 17v-4"/><path d="M4 9l5-4 5 3 6-5"/></svg></span>
       <b>Lluvias vs caudales</b><span>Compara la lluvia con el Q aforado</span>
     </button>
@@ -528,15 +529,15 @@ body{margin:0}[hidden]{display:none!important}
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 10v10"/></svg></span>
       <b>Tabla de caudales</b><span>Fecha y Q por método y sitio</span>
     </button>
-    <button class="tile" type="button" data-go-scr="mapa">
+    <button class="tile no-zonaalta" type="button" data-go-scr="mapa">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></span>
       <b>Mapa</b><span>Cuenca, río, captaciones y puntos de aforo</span>
     </button>
-    <button class="tile" type="button" data-go-scr="canal">
+    <button class="tile no-zonaalta" type="button" data-go-scr="canal">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h3l2 10h8l2-10h3"/><path d="M9 12h6"/><path d="M4 20c2-1.2 4-1.2 6 0s4 1.2 6 0 3-1 4-.6"/></svg></span>
       <b>Dimensiones canal Derivación 2</b><span>Planta y sección de los 31 puntos medidos</span>
     </button>
-    <button class="tile solo-legal" type="button" data-go-scr="res">
+    <button class="tile solo-legal no-zonaalta" type="button" data-go-scr="res">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 11h6M9 14h6M9 17h3"/><circle cx="16.5" cy="17.5" r="2.5"/></svg></span>
       <b>Resoluciones CVC</b><span>Concesiones: vigencia, caudal y documento</span>
     </button>
@@ -723,7 +724,7 @@ body{margin:0}[hidden]{display:none!important}
       <label class="f full">Nombre completo <input id="us-nombre" type="text" required></label>
       <label class="f">Usuario <span class="unit">(sin espacios ni tildes)</span> <input id="us-user" type="text" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
       <label class="f">Contraseña inicial <input id="us-pass" type="text" autocomplete="off" required></label>
-      <label class="f">Rol <select id="us-rol"><option value="usuario">Usuario (guarda aforos y consulta todo, incluidas las resoluciones)</option><option value="otros">Otros (consulta, sin resoluciones CVC)</option><option value="admin">Administrador (edita todo)</option></select></label>
+      <label class="f">Rol <select id="us-rol"><option value="usuario">Usuario (guarda aforos y consulta todo, incluidas las resoluciones)</option><option value="otros">Otros (consulta, sin resoluciones CVC)</option><option value="zonaalta">Usuario zona alta (solo calculadora y sus propios aforos)</option><option value="admin">Administrador (edita todo)</option></select></label>
     </div>
     <button class="btn primary" type="submit" id="us-btn">Crear usuario</button>
     <p class="msg-ok" id="us-ok" role="status"></p>
@@ -998,7 +999,7 @@ body{margin:0}[hidden]{display:none!important}
               <input id="s-hora" type="time"></label>
           </div>
         </div>
-        <label class="f">Responsable <span class="unit">(opcional)</span>
+        <label class="f no-zonaalta">Responsable <span class="unit">(opcional)</span>
           <input id="s-resp" type="text" autocomplete="off"></label>
         <button class="btn primary" id="s-save" type="button">Guardar en Drive de AURPA</button>
         <p class="hint" id="s-msg"></p>
@@ -1569,6 +1570,11 @@ body{margin:0}[hidden]{display:none!important}
   function showDest() {
     $("s-predio-w").hidden = current === "sec";
     const s = sitioActual();
+    if ((sesionActual() || {}).rol === "zonaalta") {
+      $("s-dest").innerHTML = s ? `Se guarda a tu nombre en <strong>Aforos usuarios zona alta › ${esc(current === "sec" ? "Molinete" : (OTROS[current] || ""))} › ${esc(s)}</strong>.`
+        : (current === "sec" ? "Escribe el sitio de medición en «Datos del aforo»." : "Elige el lugar del aforo.");
+      return;
+    }
     $("s-dest").innerHTML = current === "sec"
       ? (s ? `Se guarda en <strong>Molinete › ${esc(s)}</strong>.` : "Escribe el sitio de medición en «Datos del aforo».")
       : `Se guarda en la carpeta <strong>${esc(OTROS[current] || "")}</strong>, dentro del sitio que escribas.`;
@@ -1603,9 +1609,10 @@ body{margin:0}[hidden]{display:none!important}
   function sitiosDelDrive(lista) {
     sitios = [];
     const pendientes = (ls.get("aforo-pendientes", []) || []).map((p) => p && p.predio);
-    mergeSitios(SITIOS_BASE.concat(lista || [], pendientes));
+    mergeSitios(sitiosBase().concat(lista || [], pendientes));
   }
-  mergeSitios(SITIOS_BASE.concat(ls.get(SKEY, [])));
+  function sitiosBase() { const s = ls.get("aforo-sesion", null); return s && s.rol === "zonaalta" ? [] : SITIOS_BASE; }   // zona alta no recibe los sitios de AURPA
+  mergeSitios(sitiosBase().concat(ls.get(SKEY, [])));
 
   const pickers = [
     { sel: $("c-sitio-sel"), wrap: $("c-sitio-w"), input: $("c-sitio") },
@@ -1707,7 +1714,7 @@ body{margin:0}[hidden]{display:none!important}
     return n ? ` <span class="pend">${n} aforo(s) pendiente(s) de enviar.</span>` : "";
   }
   async function flush() {
-    if (!DRIVE_URL || !navigator.onLine || !token() || !["admin", "usuario"].includes((sesionActual() || {}).rol)) return;
+    if (!DRIVE_URL || !navigator.onLine || !token() || !["admin", "usuario", "zonaalta"].includes((sesionActual() || {}).rol)) return;
     let q = ls.get(QKEY, []); if (!q.length) return;
     const left = [];
     for (const p of q) { try { await send(p); } catch (e) { if (!e.fatal) left.push(p); } }
@@ -1813,13 +1820,14 @@ body{margin:0}[hidden]{display:none!important}
   const fdl = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
   const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const onShow = {};
-  const ROL_TXT = { admin: "Administrador", usuario: "Usuario", otros: "Otros" };
+  const ROL_TXT = { admin: "Administrador", usuario: "Usuario", otros: "Otros", zonaalta: "Usuario zona alta" };
   // Clases en <body> según el rol: el administrador edita; «otros» no ve temas legales (resoluciones CVC).
   function clasesRol() {
     const r = (sesionActual() || {}).rol || (PREVIEW ? "admin" : "");
     document.body.classList.toggle("es-admin", r === "admin");
     document.body.classList.toggle("rol-otros", r === "otros");
-    document.body.classList.toggle("puede-guardar", r === "admin" || r === "usuario");
+    document.body.classList.toggle("puede-guardar", r === "admin" || r === "usuario" || r === "zonaalta");
+    document.body.classList.toggle("rol-zonaalta", r === "zonaalta");
   }
   let scr = "";
 
@@ -1830,6 +1838,7 @@ body{margin:0}[hidden]{display:none!important}
     if (name === "login" && (ses || PREVIEW)) name = "inicio";
     if (name === "usuarios" && !(ses && ses.rol === "admin")) name = "inicio";
     if (name === "res" && ses && ses.rol === "otros") name = "inicio";
+    if (ses && ses.rol === "zonaalta" && !["inicio", "calc", "tabla", "cuenta", "login"].includes(name)) name = "inicio";
     clasesRol();
     if (!$("visor").hidden) cerrarVisor(false);
     document.querySelectorAll(".scr").forEach((s) => (s.hidden = s.id !== "scr-" + name));
@@ -1880,7 +1889,7 @@ body{margin:0}[hidden]{display:none!important}
     $("sync-note").textContent = "Actualizando datos del Drive…";
     cargando = api("datos").then((j) => {
       if (j && j.ok) {
-        datos = { t: Date.now(), aforos: j.aforos || {}, sitios: j.sitios || [], ubicaciones: j.ubicaciones || {} };
+        datos = { t: Date.now(), aforos: j.aforos || {}, zonaAlta: j.zonaAlta || {}, sitios: j.sitios || [], ubicaciones: j.ubicaciones || {} };
         ls.set(DKEY, datos); sitiosDelDrive(datos.sitios); syncPickers();
         if (onShow[scr] && scr !== "calc") onShow[scr]();
       }
@@ -2238,20 +2247,28 @@ body{margin:0}[hidden]{display:none!important}
       llenarSelect($("tq-metodo"), [{ v: p.m, t: p.m }], p.m);
       llenarSelect($("tq-sitio"), [{ v: p.s, t: p.s }], p.s);
     }
-    const ms = metodosConDatos();
-    if (!ms.length) { $("tq-tabla").innerHTML = `<tr><td class="empty">Todavía no hay aforos guardados.</td></tr>`; return; }
-    llenarSelect($("tq-metodo"), ms.map((m) => ({ v: m, t: m })), $("tq-metodo").value || (ms.includes("Molinete") ? "Molinete" : ms[0]));
-    const met = $("tq-metodo").value, sitios = sitiosDe(met), elegido = $("tq-sitio").value;
-    llenarSelect($("tq-sitio"), [{ v: "", t: "Todos los sitios" }].concat(sitios.map((x) => ({ v: x.s, t: x.s }))), elegido);
-    const filtro = $("tq-sitio").value;
-    let html = "<thead><tr><th>Fecha</th><th>Q (L/s)</th></tr></thead><tbody>";
-    sitios.filter((x) => !filtro || x.s === filtro).forEach((x) => {
-      const filas = datos.aforos[met].filter((a) => a.s === x.s).sort((a, b) => (a.f + a.h < b.f + b.h ? 1 : -1));
-      html += `<tr class="grp"><td colspan="2">${esc(x.s)} <span>· ${filas.length} aforo(s)</span></td></tr>`;
-      html += filas.map((a) => `<tr><td>${fdl(a.f)}${a.h ? ` <span class="note">${esc(a.h)}</span>` : ""}</td><td>${fmt(a.q, 1)}</td></tr>`).join("");
+    const za = datos.zonaAlta || {}, soyZA = (sesionActual() || {}).rol === "zonaalta";
+    const opciones = metodosConDatos().map((m) => ({ v: m, t: m }))
+      .concat(Object.keys(za).filter((m) => za[m].length).map((m) => ({ v: "za:" + m, t: (soyZA ? "Mis aforos · " : "Zona alta · ") + m })));
+    if (!opciones.length) { $("tq-tabla").innerHTML = `<tr><td class="empty">${soyZA ? "Todavía no has guardado aforos." : "Todavía no hay aforos guardados."}</td></tr>`; $("tq-note").textContent = ""; return; }
+    llenarSelect($("tq-metodo"), opciones, $("tq-metodo").value || (opciones.some((o) => o.v === "Molinete") ? "Molinete" : opciones[0].v));
+    const v = $("tq-metodo").value, esZA = v.indexOf("za:") === 0, met = esZA ? v.slice(3) : v;
+    const lista = esZA ? (za[met] || []) : ((datos.aforos || {})[met] || []);
+    const cuenta = {}; lista.forEach((a) => (cuenta[a.s] = (cuenta[a.s] || 0) + 1));
+    const sitiosT = Object.keys(cuenta).sort((x, y) => x.localeCompare(y, "es"));
+    llenarSelect($("tq-sitio"), [{ v: "", t: "Todos los sitios" }].concat(sitiosT.map((s) => ({ v: s, t: s }))), $("tq-sitio").value);
+    const filtro = $("tq-sitio").value, conResp = esZA && !soyZA, cols = conResp ? 3 : 2;
+    let html = `<thead><tr><th>Fecha</th>${conResp ? "<th>Hecho por</th>" : ""}<th>Q (L/s)</th></tr></thead><tbody>`;
+    sitiosT.filter((s) => !filtro || s === filtro).forEach((s) => {
+      const filas = lista.filter((a) => a.s === s).sort((a, b) => (a.f + a.h < b.f + b.h ? 1 : -1));
+      html += `<tr class="grp"><td colspan="${cols}">${esc(s)} <span>· ${filas.length} aforo(s)</span></td></tr>`;
+      html += filas.map((a) => `<tr><td>${fdl(a.f)}${a.h ? ` <span class="note">${esc(a.h)}</span>` : ""}</td>${conResp ? `<td>${esc(a.r || a.u || "—")}</td>` : ""}<td>${fmt(a.q, 1)}</td></tr>`).join("");
     });
     $("tq-tabla").innerHTML = html + "</tbody>";
-    $("tq-note").textContent = `Caudales del método ${met}, tal como están en el resumen del Drive. Se actualiza cada vez que se guarda un aforo.`;
+    $("tq-note").textContent = esZA
+      ? (soyZA ? `Tus aforos con el método ${met}. Solo tú (y los administradores de AURPA) los ven.`
+               : `Aforos de los usuarios zona alta con el método ${met}, guardados aparte en la carpeta «Aforos usuarios zona alta» del Drive.`)
+      : `Caudales del método ${met}, tal como están en el resumen del Drive. Se actualiza cada vez que se guarda un aforo.`;
   };
 
   // ---------- Mapa ----------
@@ -2817,7 +2834,7 @@ body{margin:0}[hidden]{display:none!important}
       const yo = (sesionActual() || {}).usuario;
       $("us-list").innerHTML = j.usuarios.map((u) => `<div class="urow" data-u="${esc(u.usuario)}">
         <div class="txt"><b>${esc(u.nombre)}<span class="badge">${ROL_TXT[u.rol] || "Usuario"}</span>${u.activo ? "" : '<span class="badge off">Desactivado</span>'}</b><span>${esc(u.usuario)}</span></div>
-        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<select class="us-rolsel" aria-label="Rol de ${esc(u.nombre)}">${["usuario", "otros", "admin"].map((r) => `<option value="${r}"${(u.rol || "usuario") === r ? " selected" : ""}>${ROL_TXT[r]}</option>`).join("")}</select><button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button>`}
+        ${u.usuario === yo ? '<span class="note">(tú)</span>' : `<select class="us-rolsel" aria-label="Rol de ${esc(u.nombre)}">${["usuario", "otros", "zonaalta", "admin"].map((r) => `<option value="${r}"${(u.rol || "usuario") === r ? " selected" : ""}>${ROL_TXT[r]}</option>`).join("")}</select><button class="btn" type="button" data-accion="clave">Nueva contraseña</button><button class="btn" type="button" data-accion="${u.activo ? "off" : "on"}">${u.activo ? "Desactivar" : "Activar"}</button>`}
       </div>`).join("");
     } catch (e) { $("us-list").innerHTML = ""; $("us-msg").textContent = e.message || "Sin conexión."; }
   };
@@ -2869,7 +2886,9 @@ body{margin:0}[hidden]{display:none!important}
       $("f-clave").reset(); $("cu-msg").className = "msg-ok"; $("cu-msg").textContent = "Contraseña cambiada.";
     } catch (err) { $("cu-msg").className = "msg-err"; $("cu-msg").textContent = err.message || "Sin conexión."; }
   });
-  $("cu-salir").addEventListener("click", () => { ls.set(SES, null); olvidarResoluciones(); go("login"); prepararLogin(); });
+  $("cu-salir").addEventListener("click", () => { ls.set(SES, null); olvidarResoluciones(); olvidarDatosLocales(); go("login"); prepararLogin(); });
+  // Datos descargados (caudales y lista de sitios) de la sesión anterior: no deben quedar a la vista de otra persona.
+  function olvidarDatosLocales() { datos = null; ls.set(DKEY, null); sitios = []; ls.set(SKEY, []); mergeSitios(sitiosBase()); syncPickers(); }
 
   // ---------- Inicio de sesión ----------
   async function prepararLogin() {
@@ -2881,9 +2900,11 @@ body{margin:0}[hidden]{display:none!important}
   }
   function entrar(j) {
     ls.set(SES, { token: j.token, usuario: j.usuario, nombre: j.nombre, rol: j.rol, exp: j.exp });
+    olvidarDatosLocales();
     iniciales();
     if (!$("s-resp").value.trim()) $("s-resp").value = j.nombre;
-    go("inicio"); cargarDatos(); cargarSitios(); flush(); refrescarLluvias();
+    go("inicio"); cargarDatos(); cargarSitios(); flush();
+    if (j.rol !== "zonaalta") refrescarLluvias();
   }
   function iniciales() {
     const s = sesionActual();

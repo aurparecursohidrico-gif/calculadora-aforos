@@ -19,6 +19,7 @@ App de aforos de la Asociación de Usuarios del Río La Paila (AURPA). Elaborada
 | Administrador | Todo: guardar aforos, subir lluvias y mapas, ubicar sitios, crear usuarios y cambiar roles, agregar/editar/eliminar resoluciones. |
 | Usuario | Guardar aforos y consultar todas las herramientas, incluidas las resoluciones. No edita lo demás. |
 | Otros | Consultar las herramientas. No ve las resoluciones CVC. |
+| Usuario zona alta | Solo la calculadora de aforos y la tabla de caudales con **sus propios** aforos. Sus aforos se guardan aparte, en la carpeta «Aforos usuarios zona alta» del Drive, con el nombre de quien lo hizo. Administradores y usuarios los ven en la tabla como «Zona alta · método». |
 
 ## Dónde está cada cosa
 

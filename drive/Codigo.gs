@@ -22,6 +22,8 @@
  *   admin    → todo: guardar aforos, subir lluvias, ubicar sitios, crear usuarios y actualizar resoluciones CVC.
  *   usuario  → guarda aforos y consulta todas las herramientas, incluidas las resoluciones CVC (no edita lo demás).
  *   otros    → solo consulta las herramientas; NO ve las resoluciones CVC (temas legales).
+ *   zonaalta → «Usuario zona alta»: solo la calculadora y la tabla de caudales con SUS PROPIOS aforos.
+ *              Sus aforos se guardan aparte, en la carpeta «Aforos usuarios zona alta» (Método › Sitio › Sitio – fecha).
  *
  * Se instala UNA vez desde la cuenta aurparecursohidrico@gmail.com
  * (Implementar → Nueva implementación → Aplicación web).
@@ -46,9 +48,14 @@ function doPost(e) {
 
     var ses = sesion(a.token);
     if (!ses) return responder({ ok: false, sesion: false, error: 'Tu sesión venció. Vuelve a iniciar sesión.' });
-    if (accion === 'datos') return responder({ ok: true, aforos: aforosPorMetodo(), sitios: listarSitios(), ubicaciones: leerUbicaciones() });
-    if (accion === 'sitios') return responder({ ok: true, sitios: listarSitios() });
+    var za = ses.rol === 'zonaalta';
     if (accion === 'cambiarClave') return responder(cambiarClave(ses, a));
+    // Usuario zona alta: solo sus propios aforos (y los sitios de su carpeta); nada más de la app.
+    if (za && accion === 'datos') return responder({ ok: true, aforos: {}, zonaAlta: aforosZonaAlta(ses.usuario), sitios: sitiosZonaAlta(), ubicaciones: {} });
+    if (za && accion === 'sitios') return responder({ ok: true, sitios: sitiosZonaAlta() });
+    if (za && accion !== 'guardar') return responder({ ok: false, error: 'Tu usuario solo tiene acceso a la calculadora y a la tabla de tus aforos.' });
+    if (accion === 'datos') return responder({ ok: true, aforos: aforosPorMetodo(), zonaAlta: aforosZonaAlta(null), sitios: listarSitios(), ubicaciones: leerUbicaciones() });
+    if (accion === 'sitios') return responder({ ok: true, sitios: listarSitios() });
     if (accion === 'lluvias') return responder({ ok: true, dias: leerLluvias(), areas: leerAreas(), mapas: listarMapas() });
     if (accion === 'mapaLluvia') return responder(leerMapa(a.mes));
     if (accion === 'resoluciones' || accion === 'resolucionPagina') {
@@ -73,7 +80,7 @@ function doPost(e) {
       if (accion === 'estadoUsuario') return responder(estadoUsuario(ses, a));
     }
     if (accion !== 'guardar') return responder({ ok: false, error: 'Acción desconocida.' });
-    if (!a.responsable) a.responsable = ses.nombre;
+    if (!a.responsable || za) a.responsable = ses.nombre;   // en zona alta el responsable es siempre quien guarda
 
     var predio = limpiarNombre(a.predio, 80);
     if (!predio) return responder({ ok: false, error: 'Falta el nombre del predio.' });
@@ -81,9 +88,10 @@ function doPost(e) {
     var lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
-      var carpetaDelMetodo = carpetaMetodo(nombreMetodo(a.metodo));
+      var carpetaDelMetodo = za ? buscarOCrear(carpetaZonaAlta(), nombreMetodo(a.metodo)) : carpetaMetodo(nombreMetodo(a.metodo));
       var carpeta = carpetaPredio(predio, carpetaDelMetodo);
       var resumen = hojaResumen(carpeta, predio);
+      if (za) conUsuario(resumen);
 
       // Si este aforo ya se había guardado (reintento sin señal), no se duplica.
       var id = limpiar(a.id, 60);
@@ -98,11 +106,12 @@ function doPost(e) {
         'Mira inicial (cm)': numero(a.mira_ini != null ? a.mira_ini : dato(a, /mira inicial/i)),
         'Mira final (cm)': numero(a.mira_fin != null ? a.mira_fin : dato(a, /mira final/i)),
         'Sitio de medición': limpiar(a.sitio, 80), 'Responsable': limpiar(a.responsable, 80),
-        'Archivo': archivo.getUrl(), 'ID': id, 'Guardado': new Date(), 'Carpeta': dia.getUrl()
+        'Archivo': archivo.getUrl(), 'ID': id, 'Guardado': new Date(), 'Carpeta': dia.getUrl(), 'Usuario': za ? ses.usuario : ''
       };
       agregarFila(resumen, valores);
       numerar(resumen);
       var delMetodo = hojaResumenMetodo(carpetaDelMetodo);
+      if (za) conUsuario(delMetodo);
       agregarFila(delMetodo, valores);
       numerar(delMetodo);
       return responder({ ok: true, carpeta: dia.getUrl(), nombre: dia.getName(), archivo: archivo.getUrl() });
@@ -239,7 +248,7 @@ function estadoUsuario(ses, a) {
   if (a.rol) sh.getRange(usr.fila, 3).setValue(rolValido(a.rol));   // cambiar el rol (no el propio: se revisa arriba)
   return { ok: true };
 }
-function rolValido(r) { return r === 'admin' || r === 'otros' ? r : 'usuario'; }
+function rolValido(r) { return r === 'admin' || r === 'otros' || r === 'zonaalta' ? r : 'usuario'; }
 function cambiarClave(ses, a) {
   var usr = filasUsuarios().filter(function (x) { return x.usuario === ses.usuario; })[0];
   if (!usr || huella(usr.sal, String(a.actual || '')) !== usr.huella) return { ok: false, error: 'La contraseña actual no es correcta.' };
@@ -252,9 +261,15 @@ function cambiarClave(ses, a) {
 // =====================================================================
 // DATOS PARA LA APP: caudales por método (fecha y Q) y ubicación de los sitios
 // =====================================================================
-function aforosPorMetodo() {
+function aforosPorMetodo() { return aforosDeCarpeta(carpetaRaiz(), null); }
+// Aforos de los usuarios zona alta (de uno solo si se da su usuario), con el nombre de quien lo hizo.
+function aforosZonaAlta(usuario) {
+  var c = carpetaZonaAlta(false);
+  return c ? aforosDeCarpeta(c, usuario) : {};
+}
+function aforosDeCarpeta(base, soloUsuario) {
   var out = {}, metodos = METODOS.map(normalizar);
-  var it = carpetaRaiz().getFolders();
+  var it = base.getFolders();
   while (it.hasNext()) {
     var carpeta = it.next(); if (carpeta.isTrashed()) continue;   // lo que está en la papelera no cuenta
     var k = metodos.indexOf(normalizar(carpeta.getName()));
@@ -274,9 +289,11 @@ function aforosPorMetodo() {
         f: fe instanceof Date ? Utilities.formatDate(fe, tz, 'yyyy-MM-dd') : String(fe || ''),
         h: ho instanceof Date ? Utilities.formatDate(ho, tz, 'HH:mm') : String(ho || ''),
         q: numero(r[c('Caudal (L/s)')]),
-        mi: c('Mira inicial (cm)') >= 0 ? numero(r[c('Mira inicial (cm)')]) : ''
+        mi: c('Mira inicial (cm)') >= 0 ? numero(r[c('Mira inicial (cm)')]) : '',
+        r: c('Responsable') >= 0 ? String(r[c('Responsable')] || '') : '',
+        u: c('Usuario') >= 0 ? String(r[c('Usuario')] || '') : ''
       };
-    }).filter(function (x) { return x.s && x.f && x.q !== ''; });
+    }).filter(function (x) { return x.s && x.f && x.q !== '' && (!soloUsuario || x.u === soloUsuario); });
   }
   return out;
 }
@@ -474,7 +491,7 @@ function listarSitios() {
     if (metodos.indexOf(normalizar(f.getName())) >= 0) {
       var it2 = f.getFolders();
       while (it2.hasNext()) { var g = it2.next(); if (!g.isTrashed()) agregar(g.getName()); }
-    } else if (!/\(app\)\s*$/i.test(f.getName())) {   // carpetas internas de la app (p. ej. "Mapas de lluvias (app)") no son sitios
+    } else if (!esCarpetaInterna(f.getName())) {   // carpetas internas de la app (p. ej. "Mapas de lluvias (app)") no son sitios
       agregar(f.getName());
     }
   }
@@ -611,6 +628,35 @@ function paginaResolucion(a) {
   return { ok: false, error: 'No se encontró la página ' + p + '.' };
 }
 
+// ---------- aforos de usuarios zona alta ----------
+var CARPETA_ZA = 'Aforos usuarios zona alta';
+function carpetaZonaAlta(crear) {
+  var raiz = carpetaRaiz(), it = raiz.getFoldersByName(CARPETA_ZA);
+  while (it.hasNext()) { var f = it.next(); if (!f.isTrashed()) return f; }
+  return crear === false ? null : raiz.createFolder(CARPETA_ZA);
+}
+function sitiosZonaAlta() {
+  var c = carpetaZonaAlta(false), vistos = {}, lista = [];
+  if (!c) return lista;
+  var it = c.getFolders();
+  while (it.hasNext()) {
+    var m = it.next(); if (m.isTrashed()) continue;
+    var it2 = m.getFolders();
+    while (it2.hasNext()) { var s = it2.next(); var k = normalizar(s.getName()); if (!s.isTrashed() && !vistos[k]) { vistos[k] = 1; lista.push(s.getName()); } }
+  }
+  return lista.sort(function (a, b) { return a.localeCompare(b, 'es'); });
+}
+// Columna «Usuario» (inicio de sesión de quien guardó) en los resúmenes de zona alta.
+function conUsuario(sh) {
+  if (columna(sh, 'Usuario')) return sh;
+  var c = columna(sh, 'Responsable') || sh.getLastColumn();
+  sh.insertColumnAfter(c);
+  sh.getRange(1, c + 1).setValue('Usuario').setFontWeight('bold').setBackground('#e6f3e2');
+  return sh;
+}
+// Carpetas de la raíz que no son sitios de medición ni se deben mover.
+function esCarpetaInterna(nombre) { return /\(app\)\s*$/i.test(nombre) || nombre === CARPETA_ZA; }
+
 // ---------- carpetas ----------
 function carpetaRaiz() {
   var props = PropertiesService.getScriptProperties();
@@ -652,7 +698,7 @@ function organizarPorMetodo() {
   var it = raiz.getFolders();
   while (it.hasNext()) {
     var f = it.next();
-    if (f.isTrashed() || /\(app\)\s*$/i.test(f.getName())) continue;   // papelera y carpetas internas de la app no se mueven
+    if (f.isTrashed() || esCarpetaInterna(f.getName())) continue;   // papelera y carpetas internas de la app no se mueven
     if (metodos.indexOf(normalizar(f.getName())) < 0) sueltas.push(f);
   }
   sueltas.forEach(function (sitio) {
